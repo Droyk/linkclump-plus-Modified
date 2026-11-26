@@ -25,6 +25,11 @@ vi.mock("wxt/browser", () => ({
 			sync: {
 				get: vi.fn(),
 				set: vi.fn()
+			},
+			local: {
+				get: vi.fn(),
+				set: vi.fn(),
+				remove: vi.fn()
 			}
 		},
 		scripting: {

@@ -77,6 +77,22 @@ export function handleRequests(
 			);
 			return false;
 		}
+		case "changeStorageMode": {
+			safeAsync("changeStorageMode", async () => {
+				try {
+					await deps.settingsManager.changeStorageMode(request.mode);
+					sendResponse({ ok: true, mode: request.mode });
+				} catch (error) {
+					sendResponse({
+						ok: false,
+						mode: await deps.settingsManager.getStorageMode(),
+						error: error instanceof Error ? error.message : String(error)
+					});
+					throw error;
+				}
+			}, "background");
+			return true;
+		}
 		case "init": {
 			// Notes: Reply through sendResponse and return true, instead of returning a Promise from the
 			// listener: returning a Promise directly is only supported natively starting in Chrome 148+,
@@ -84,7 +100,9 @@ export function handleRequests(
 			// the sender does not wait forever for a reply.
 			safeAsync("init", async () => {
 				try {
-					sendResponse(await deps.settingsManager.load());
+					const settings = await deps.settingsManager.load();
+					const storageMode = await deps.settingsManager.getStorageMode();
+					sendResponse({ ...settings, storageMode });
 				} catch (error) {
 					sendResponse(undefined);
 					throw error;

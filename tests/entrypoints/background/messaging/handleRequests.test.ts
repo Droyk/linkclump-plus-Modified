@@ -16,7 +16,7 @@ import { handleRequests } from "@/entrypoints/background/messaging/handleRequest
 import { handleActivate } from "@/entrypoints/background/messaging/handleActivate";
 import { handleUpdateSettings } from "@/entrypoints/background/messaging/handleUpdateSettings";
 import { sequentialQueueManager } from "@/entrypoints/background/queue/SequentialQueueManager";
-import type { StartSequentialQueueMessage, StopSequentialQueueMessage } from "@/assets/js/types/Messages";
+import type { ChangeStorageModeMessage, StartSequentialQueueMessage, StopSequentialQueueMessage } from "@/assets/js/types/Messages";
 import type { Deps } from "@/entrypoints/background/deps";
 import type { InitMessage, Messages } from "@/assets/js/types/Messages";
 import type { Browser } from "wxt/browser";
@@ -77,7 +77,7 @@ const testData = {
 		{
 			name: "should call sendResponse with loaded settings asynchronously for 'init' message",
 			input: { request: INIT_REQUEST, load: () => Promise.resolve(LOADED_SETTINGS) },
-			expected: { responseArgs: [ LOADED_SETTINGS ], loadCalls: 1 }
+			expected: { responseArgs: [ { ...LOADED_SETTINGS, storageMode: "sync" } ], loadCalls: 1 }
 		},
 		{
 			name: "should call sendResponse(undefined) when settingsManager.load fails",
@@ -109,7 +109,13 @@ function createContext() {
 	const load = vi.fn();
 	const sendResponse = vi.fn();
 	const deps = {
-		settingsManager: { load, save: vi.fn(), init: vi.fn() },
+		settingsManager: {
+			load,
+			save: vi.fn(),
+			init: vi.fn(),
+			getStorageMode: vi.fn().mockResolvedValue("sync"),
+			changeStorageMode: vi.fn().mockResolvedValue(undefined)
+		},
 		contentScriptManager: { broadcastSettingsUpdate: vi.fn() }
 	} as unknown as Deps;
 
@@ -206,6 +212,18 @@ describe("handleRequests messaging protocol (H2 migration)", () => {
 			expect(handleRequests(request, DUMMY_SENDER, context.sendResponse, context.deps)).toBe(true);
 			await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalledWith({ ok: true }));
 			expect(sequentialQueueManager.stop).toHaveBeenCalledTimes(1);
+		});
+	});
+
+		it("changes the storage mode and acknowledges the selected scope", async () => {
+			const request: ChangeStorageModeMessage = {
+				message: "changeStorageMode",
+				mode: "local"
+			};
+
+			expect(handleRequests(request, DUMMY_SENDER, context.sendResponse, context.deps)).toBe(true);
+			await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalledWith({ ok: true, mode: "local" }));
+			expect(context.deps.settingsManager.changeStorageMode).toHaveBeenCalledWith("local");
 		});
 	});
 

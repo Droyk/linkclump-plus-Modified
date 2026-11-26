@@ -1,4 +1,4 @@
-import type { CopyFormat, Settings } from "./Settings";
+import type { CopyFormat, Settings, SettingsStorageMode } from "./Settings";
 
 export type ActivateMessage_copy = {
 	"action": "copy",
@@ -77,6 +77,20 @@ export type CreateLazyTabsMessage = {
 	"blockDuplicates"?: boolean;
 };
 
-export type Messages = ActivateMessage | InitMessage | UpdateMessage | StartSequentialQueueMessage | StopSequentialQueueMessage | CreateLazyTabsMessage;
+export type ChangeStorageModeMessage = {
+	"message": "changeStorageMode";
+	"mode": SettingsStorageMode;
+};
 
-export type InitResponse = Settings & { error?: string };
+export type ChangeStorageModeResponse = {
+	readonly ok: boolean;
+	readonly mode: SettingsStorageMode;
+	readonly error?: string;
+};
+
+export type Messages = ActivateMessage | InitMessage | UpdateMessage | StartSequentialQueueMessage | StopSequentialQueueMessage | CreateLazyTabsMessage | ChangeStorageModeMessage;
+
+export type InitResponse = Settings & {
+	error?: string;
+	storageMode?: SettingsStorageMode;
+};

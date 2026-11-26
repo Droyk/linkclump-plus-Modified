@@ -48,7 +48,8 @@ import {
 
 import type { OsType } from "@/assets/js/types/OS";
 import type { OptionsSchema } from "@/assets/js/types/Options";
-import type { ActionOptionValue, ActionSetting, Settings } from "@/assets/js/types/Settings";
+import type { ActionOptionValue, ActionSetting, Settings, SettingsStorageMode } from "@/assets/js/types/Settings";
+import type { ChangeStorageModeMessage, ChangeStorageModeResponse, InitResponse } from "@/assets/js/types/Messages";
 
 // jQuery
 import $ from "jquery";
@@ -179,6 +180,7 @@ const optionsSchema: OptionsSchema = {
 
 const colors: string[] = [ "458B74", "838B8B", "CCCCCC", "0000FF", "8A2BE2", "D2691E", "6495ED", "DC143C", "006400", "9400D3", "1E90FF", "228B22", "00FF00", "ADFF2F", "FF69B4", "4B0082", "F0E68C", "8B814C", "87CEFA", "32CD32", "000080", "FFA500", "FF4500", "DA70D6", "8B475D", "8B668B", "FF0000", "2E8B57", "8E388E", "FFFF00" ];
 let currentSettings: Settings | null = null;
+let currentStorageMode: SettingsStorageMode = "sync";
 const div_history: Record<string, JQuery> = {};
 
 let keys: Record<number, string>;
@@ -234,14 +236,23 @@ function initEvent() {
 
 	setup_form();
 	setupSelectionSettings();
+	setupStorageModeSettings();
 
 	browser.runtime.sendMessage(
 		{
 			message: "init",
 			debug: true
 		}
-	).then((response: Settings) => {
-		currentSettings = response;
+	).then((response: InitResponse | undefined) => {
+		if (!response) {
+			console.error("Failed to load settings: response is null or undefined.");
+			return;
+		}
+
+		const { storageMode = "sync", ...settings } = response;
+		currentStorageMode = storageMode;
+		currentSettings = settings;
+		renderStorageModeSettings();
 
 		if (!currentSettings) {
 			console.error("Failed to load settings: response is null or undefined.");
@@ -418,6 +429,86 @@ function updateSelectionSettingVisibility(): void {
 	if (holdLabel) {
 		holdLabel.classList.toggle("disabled", mode === "keyboard-only");
 	}
+}
+
+
+/** Wires the user-selectable Local / Sync settings storage preference. */
+function setupStorageModeSettings(): void {
+	const select = document.getElementById("settings-storage-mode") as HTMLSelectElement | null;
+	select?.addEventListener("change", saveStorageMode);
+	if (select) {
+		select.disabled = true;
+	}
+}
+
+/** Reflects the current backend storage scope. */
+function renderStorageModeSettings(): void {
+	const select = document.getElementById("settings-storage-mode") as HTMLSelectElement | null;
+	const status = document.getElementById("settings-storage-status");
+	if (select) {
+		select.value = currentStorageMode;
+		select.disabled = false;
+	}
+	if (status) {
+		status.textContent = currentStorageMode === "local"
+			? "Saved only in this browser profile. These settings are not synced to your other devices."
+			: "Saved in browser sync storage and may sync to other browsers using the same browser account.";
+	}
+}
+
+/**
+ * Changes scope only after the background copies current settings and version successfully.
+ * The storage manager switches its local marker last, so a failed migration leaves the old
+ * location active and the UI reverts to it.
+ */
+function saveStorageMode(): void {
+	const select = document.getElementById("settings-storage-mode") as HTMLSelectElement | null;
+	const status = document.getElementById("settings-storage-status");
+	if (!select) {
+		return;
+	}
+
+	const requested = select.value;
+	if (requested !== "local" && requested !== "sync") {
+		select.value = currentStorageMode;
+		return;
+	}
+	if (requested === currentStorageMode) {
+		return;
+	}
+
+	select.disabled = true;
+	if (status) {
+		status.textContent = "Moving your settings to the selected storage scope…";
+	}
+
+	const request: ChangeStorageModeMessage = {
+		message: "changeStorageMode",
+		mode: requested
+	};
+
+	safeAsync("changeSettingsStorageMode", async () => {
+		try {
+			const response = await browser.runtime.sendMessage(request) as ChangeStorageModeResponse;
+			currentStorageMode = response.mode;
+			select.value = response.mode;
+			if (status) {
+				status.textContent = response.ok
+					? (response.mode === "local"
+						? "Saved only in this browser profile. These settings are not synced to your other devices."
+						: "Saved in browser sync storage and may sync to other browsers using the same browser account.")
+					: "Storage change failed. Your previous storage location remains active.";
+			}
+		} catch (error) {
+			select.value = currentStorageMode;
+			if (status) {
+				status.textContent = "Storage change failed: " + (error instanceof Error ? error.message : String(error));
+			}
+			throw error;
+		} finally {
+			select.disabled = false;
+		}
+	}, "options");
 }
 
 function close_form(event?: Event | JQuery.TriggeredEvent) {

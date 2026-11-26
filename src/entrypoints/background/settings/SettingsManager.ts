@@ -13,7 +13,7 @@ import {
 } from "@/assets/js/constants/setting";
 
 import type { StorageManager } from "./StorageManager";
-import type { Settings } from "@/assets/js/types/Settings";
+import type { Settings, SettingsStorageMode } from "@/assets/js/types/Settings";
 
 /**
  * Install state judged from the stored format version.
@@ -30,8 +30,18 @@ export class SettingsManager {
 		this.storageManager = storageManager;
 	}
 
+	/** Returns the active Local/Sync settings scope. */
+	getStorageMode(): Promise<SettingsStorageMode> {
+		return this.storageManager.getMode();
+	}
+
+	/** Switches settings scope without discarding the previous stored copy. */
+	changeStorageMode(mode: SettingsStorageMode): Promise<void> {
+		return this.storageManager.switchMode(mode);
+	}
+
 	/**
-	 * Loads settings from sync storage, initializing with defaults if missing or invalid.
+	 * Loads settings from the active storage scope, initializing with defaults if missing or invalid.
 	 *
 	 * @returns {Promise<Settings>} Loaded or initialized settings.
 	 */
@@ -46,7 +56,7 @@ export class SettingsManager {
 	}
 
 	/**
-	 * Saves settings to sync storage after removing any transient error messages.
+	 * Saves settings to the active storage scope after removing any transient error messages.
 	 *
 	 * @param {Settings & { error?: string }} settings - Settings object to save.
 	 * @returns {Promise<void>}
@@ -83,7 +93,7 @@ export class SettingsManager {
 	}
 
 	/**
-	 * Initializes sync storage with default settings.
+	 * Initializes the active storage scope with default settings.
 	 *
 	 * @returns {Promise<Settings>} Newly initialized default settings.
 	 */

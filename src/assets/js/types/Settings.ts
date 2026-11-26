@@ -7,6 +7,8 @@ export type ActionType = "win" | "tabs" | "bm" | "copy";
 
 export type ActionOptionValue = number | boolean | string | (number | string)[];
 
+export type SettingsStorageMode = "local" | "sync";
+
 export type IndividualSelectionInputMode = "mouse-key" | "mouse-only" | "keyboard-only";
 
 /** Settings for persistent collection and individual link-selection gestures. */

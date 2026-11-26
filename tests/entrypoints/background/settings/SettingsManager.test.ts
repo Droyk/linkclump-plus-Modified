@@ -90,10 +90,15 @@ const testData = {
  */
 function createContext() {
 	const memoryStore: Record<string, unknown> = {};
+	let mode: "local" | "sync" = "sync";
 	const storageManager = {
 		get: vi.fn(async (key: string) => memoryStore[key]),
 		set: vi.fn(async (key: string, value: unknown) => {
 			memoryStore[key] = value;
+		}),
+		getMode: vi.fn(async () => mode),
+		switchMode: vi.fn(async (nextMode: "local" | "sync") => {
+			mode = nextMode;
 		})
 	};
 	const manager = new SettingsManager(storageManager as unknown as StorageManager);
@@ -162,6 +167,15 @@ describe("SettingsManager", () => {
 			await manager.save({ ...settings, blocked: [ ...settings.blocked ] });
 
 			return memoryStore[linkclumpSettingsKey];
+		});
+	});
+
+	describe("storage mode", () => {
+		it("exposes and changes the configured storage scope", async () => {
+			expect(await context.manager.getStorageMode()).toBe("sync");
+			await context.manager.changeStorageMode("local");
+			expect(await context.manager.getStorageMode()).toBe("local");
+			expect(context.storageManager.switchMode).toHaveBeenCalledWith("local");
 		});
 	});
 

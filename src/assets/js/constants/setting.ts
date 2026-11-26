@@ -25,6 +25,7 @@ export const DEFAULT_LINK_SELECTION_SETTINGS: Readonly<LinkSelectionSettings> = 
 // key name for Storage
 export const linkclumpSettingsKey = "linkclumpSettings" as const;
 export const linkclumpVersionKey = "linkclumpVersion" as const;
+export const linkclumpStorageModeKey = "linkclumpStorageMode" as const;
 
 export const DEFAULT_SETTINGS: Settings = Object.freeze({
 	"actions": Object.freeze({

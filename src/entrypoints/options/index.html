@@ -55,6 +55,18 @@
 			<button id="add" class="button">Add Action</button>
 		</div>
 
+		<div id="storage-preferences" class="info-box">
+			<h2>Settings storage</h2>
+			<p>Choose whether your extension preferences stay in this browser profile or use browser sync storage.</p>
+			<p><label for="settings-storage-mode">Storage location</label>
+				<select id="settings-storage-mode">
+					<option value="local">Local — this browser only</option>
+					<option value="sync">Sync — across signed-in browsers</option>
+				</select>
+			</p>
+			<p id="settings-storage-status" class="small-note" aria-live="polite">Loading storage preference…</p>
+		</div>
+
 		<div id="selection-preferences" class="info-box">
 			<h2>Persistent Link Collection</h2>
 			<p>When enabled, a rectangular selection adds links to a persistent collection instead of immediately running the Action configured above. The floating collection panel lets you remove links and copy, open, or bookmark the current order.</p>

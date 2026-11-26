@@ -1,7 +1,7 @@
 /**
  * StorageManager Tests
  *
- * Verifies that the thin wrapper reads and writes single keys in browser.storage.sync.
+ * Verifies the Local/Sync storage selector, migrations, and single-key reads/writes.
  *
  * @file
  * @see {@link project/vitest.config.ts} - Global settings
@@ -12,6 +12,7 @@
 import { describe, beforeEach, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { StorageManager } from "@/entrypoints/background/settings/StorageManager";
+import { linkclumpSettingsKey, linkclumpStorageModeKey, linkclumpVersionKey } from "@/assets/js/constants/setting";
 import { TestRunner, type TestCase } from "../../../shared/support/TestRunner";
 
 // =============================================================================
@@ -37,6 +38,7 @@ describe("StorageManager", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(browser.storage.local.get).mockResolvedValue({} as never);
 		manager = new StorageManager();
 	});
 
@@ -56,5 +58,69 @@ describe("StorageManager", () => {
 
 			return vi.mocked(browser.storage.sync.set).mock.calls.map(([ items ]) => items);
 		});
+	});
+
+	it("routes reads and writes to local storage when Local mode is selected", async () => {
+		vi.mocked(browser.storage.local.get).mockImplementation(async (key) => {
+			if (key === linkclumpStorageModeKey) {
+				return { [linkclumpStorageModeKey]: "local" } as never;
+			}
+			return { k: "local value" } as never;
+		});
+		vi.mocked(browser.storage.local.set).mockResolvedValue(undefined as never);
+
+		expect(await manager.get("k")).toBe("local value");
+		await manager.set("k", "updated");
+
+		expect(browser.storage.local.set).toHaveBeenCalledWith({ k: "updated" });
+		expect(browser.storage.sync.get).not.toHaveBeenCalled();
+		expect(browser.storage.sync.set).not.toHaveBeenCalled();
+	});
+
+	it("copies settings and version before switching from Sync to Local", async () => {
+		const stored = {
+			[linkclumpSettingsKey]: { actions: {}, blocked: [] },
+			[linkclumpVersionKey]: "5"
+		};
+		vi.mocked(browser.storage.sync.get).mockResolvedValue(stored as never);
+		vi.mocked(browser.storage.local.get).mockResolvedValue({} as never);
+		vi.mocked(browser.storage.local.set).mockResolvedValue(undefined as never);
+
+		await manager.switchMode("local");
+
+		expect(browser.storage.sync.get).toHaveBeenCalledWith([ linkclumpSettingsKey, linkclumpVersionKey ]);
+		expect(browser.storage.local.set).toHaveBeenNthCalledWith(1, stored);
+		expect(browser.storage.local.set).toHaveBeenNthCalledWith(2, { [linkclumpStorageModeKey]: "local" });
+	});
+
+	it("does not change the active scope if copying settings to the destination fails", async () => {
+		const stored = { [linkclumpSettingsKey]: { actions: {}, blocked: [] } };
+		const failure = new Error("Destination storage failed");
+		vi.mocked(browser.storage.sync.get).mockResolvedValue(stored as never);
+		vi.mocked(browser.storage.local.get).mockResolvedValue({} as never);
+		vi.mocked(browser.storage.local.set).mockRejectedValueOnce(failure);
+
+		await expect(manager.switchMode("local")).rejects.toThrow("Destination storage failed");
+		expect(browser.storage.local.set).toHaveBeenCalledTimes(1);
+		expect(await manager.getMode()).toBe("sync");
+	});
+
+	it("copies settings back to Sync when changing from Local to Sync", async () => {
+		const stored = {
+			[linkclumpSettingsKey]: { actions: {}, blocked: [] },
+			[linkclumpVersionKey]: "5"
+		};
+		vi.mocked(browser.storage.local.get).mockImplementation(async (key) => {
+			if (key === linkclumpStorageModeKey) {
+				return { [linkclumpStorageModeKey]: "local" } as never;
+			}
+			return stored as never;
+		});
+		vi.mocked(browser.storage.sync.set).mockResolvedValue(undefined as never);
+
+		await manager.switchMode("sync");
+
+		expect(browser.storage.sync.set).toHaveBeenCalledWith(stored);
+		expect(browser.storage.local.set).toHaveBeenCalledWith({ [linkclumpStorageModeKey]: "sync" });
 	});
 });
