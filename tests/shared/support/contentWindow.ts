@@ -9,6 +9,7 @@ import { OS_WIN } from "@/assets/js/constants/os";
 import { MOUSE_BUTTON_NONE } from "@/assets/js/constants/mouseButton";
 import { CUSTOM_TAG_LINKCLUMP } from "@/assets/js/constants/ui";
 import { type IntentionalAnyForValidation } from "../types";
+import { LinkSelectionStore } from "@/entrypoints/content/selection/LinkSelectionStore";
 
 /**
  * Resets every `window.*` global used by the content script to a neutral "idle" state:
@@ -41,6 +42,7 @@ export function resetContentWindow() {
 	window.timer = 0;
 	window.scroll_id = 0;
 	window.links = [];
+	window.linkSelection = new LinkSelectionStore();
 	window.linkclump = linkclump;
 	window.box = box;
 	window.count_label = countLabel;

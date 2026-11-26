@@ -3,6 +3,7 @@ import { browser } from "wxt/browser";
 
 import { detectOs } from "@/assets/js/lib/detectOs";
 import { applySettings, initContentScriptContext } from "./settings/applySettings";
+import { LinkSelectionStore } from "./selection/LinkSelectionStore";
 
 import type { ContentScriptContext } from "wxt/utils/content-script-context";
 import type {
@@ -93,6 +94,7 @@ function init(): void {
 	window.mouse_y = -1;
 	window.scroll_id = 0;
 	window.links = [];
+	window.linkSelection = new LinkSelectionStore();
 	// @ts-expect-error -- all will be right at the end of the function
 	window.linkclump = undefined;
 	// @ts-expect-error -- all will be right at the end of the function
