@@ -215,6 +215,7 @@ describe("handleRequests messaging protocol (H2 migration)", () => {
 		});
 	});
 
+	describe("Storage mode migration", () => {
 		it("changes the storage mode and acknowledges the selected scope", async () => {
 			const request: ChangeStorageModeMessage = {
 				message: "changeStorageMode",
