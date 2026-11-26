@@ -58,7 +58,6 @@ import "@/assets/js/lib/colorpicker/jquery.colorpicker.css";
 import "./style.css";
 
 
-
 /**
  * Static UI definition schema for the options page.
  *
@@ -325,20 +324,32 @@ function renderSelectionSettings(): void {
 	const key = document.getElementById("selection-key") as HTMLSelectElement | null;
 	const hold = document.getElementById("selection-hold-ms") as HTMLInputElement | null;
 
-	if (enabled) enabled.checked = selection.enabled;
-	if (mode) mode.value = selection.inputMode;
-	if (mouseButton) mouseButton.value = String(selection.mouseButton);
+	if (enabled) {
+		enabled.checked = selection.enabled;
+	}
+	if (mode) {
+		mode.value = selection.inputMode;
+	}
+	if (mouseButton) {
+		mouseButton.value = String(selection.mouseButton);
+	}
 	if (key && !Array.from(key.options).some((option) => option.value === String(selection.key))) {
 		const fallbackOption = document.createElement("option");
 		fallbackOption.value = String(selection.key);
 		fallbackOption.textContent = keys[selection.key]?.toUpperCase() ?? ("KEY " + selection.key);
 		key.appendChild(fallbackOption);
 	}
-	if (key) key.value = String(selection.key);
-	if (hold) hold.value = String(selection.holdDurationMs);
+	if (key) {
+		key.value = String(selection.key);
+	}
+	if (hold) {
+		hold.value = String(selection.holdDurationMs);
+	}
 
 	const error = document.getElementById("selection-error");
-	if (error) error.textContent = "";
+	if (error) {
+		error.textContent = "";
+	}
 	updateSelectionSettingVisibility();
 }
 
@@ -374,7 +385,9 @@ function saveSelectionSettings(): void {
 		key,
 		holdDurationMs
 	};
-	if (error) error.textContent = "";
+	if (error) {
+		error.textContent = "";
+	}
 	updateSelectionSettingVisibility();
 	save_settings();
 }
@@ -389,12 +402,24 @@ function updateSelectionSettingVisibility(): void {
 	const keyLabel = document.getElementById("selection-key-label");
 	const holdLabel = document.getElementById("selection-hold-label");
 
-	if (mouseButton) mouseButton.disabled = mode === "keyboard-only";
-	if (key) key.disabled = mode === "mouse-only";
-	if (hold) hold.disabled = mode === "keyboard-only";
-	if (mouseLabel) mouseLabel.classList.toggle("disabled", mode === "keyboard-only");
-	if (keyLabel) keyLabel.classList.toggle("disabled", mode === "mouse-only");
-	if (holdLabel) holdLabel.classList.toggle("disabled", mode === "keyboard-only");
+	if (mouseButton) {
+		mouseButton.disabled = mode === "keyboard-only";
+	}
+	if (key) {
+		key.disabled = mode === "mouse-only";
+	}
+	if (hold) {
+		hold.disabled = mode === "keyboard-only";
+	}
+	if (mouseLabel) {
+		mouseLabel.classList.toggle("disabled", mode === "keyboard-only");
+	}
+	if (keyLabel) {
+		keyLabel.classList.toggle("disabled", mode === "mouse-only");
+	}
+	if (holdLabel) {
+		holdLabel.classList.toggle("disabled", mode === "keyboard-only");
+	}
 }
 
 function close_form(event?: Event | JQuery.TriggeredEvent) {

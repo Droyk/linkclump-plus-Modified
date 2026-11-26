@@ -203,11 +203,16 @@ function cancelPending(resetPointerState: boolean): void {
 
 function matchesConfiguredKey(event: PointerEvent): boolean {
 	const config = window.linkSelectionSettings;
-	const pressedKey = event.metaKey ? KEY_CODE_META
-		: event.ctrlKey ? KEY_CODE_CTRL
-		: event.shiftKey ? KEY_CODE_SHIFT
-		: event.altKey ? KEY_CODE_ALT
-		: window.key_pressed;
+	let pressedKey = window.key_pressed;
+	if (event.metaKey) {
+		pressedKey = KEY_CODE_META;
+	} else if (event.ctrlKey) {
+		pressedKey = KEY_CODE_CTRL;
+	} else if (event.shiftKey) {
+		pressedKey = KEY_CODE_SHIFT;
+	} else if (event.altKey) {
+		pressedKey = KEY_CODE_ALT;
+	}
 
 	if (config.inputMode === "mouse-only") {
 		return pressedKey === 0;

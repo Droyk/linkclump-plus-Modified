@@ -9,7 +9,7 @@ const SELECTED_CLASS = "linkclump-selected-link";
 
 let host: HTMLElement | null = null;
 let unsubscribe: (() => void) | null = null;
-let activeHighlights = new Map<string, { element: HTMLElement; hadClass: boolean }>();
+const activeHighlights = new Map<string, { element: HTMLElement; hadClass: boolean }>();
 
 /** Creates the isolated floating manager and subscribes it to the page's selection store. */
 export function createSelectionToolbar(store: LinkSelectionStore): void {
