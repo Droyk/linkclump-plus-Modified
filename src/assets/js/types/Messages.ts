@@ -1,4 +1,11 @@
 import type { CopyFormat, Settings, SettingsStorageMode } from "./Settings";
+import type {
+	LinkManagerAddLinksRequest,
+	LinkManagerQueueMode,
+	LinkManagerReadStatus,
+	LinkManagerTabDuplicate,
+	LinkManagerViewMode
+} from "./LinkManager";
 
 export type ActivateMessage_copy = {
 	"action": "copy",
@@ -14,7 +21,7 @@ export type ActivateMessage_bm = {
 	"options": {
 		"block": boolean,
 		"reverse": boolean,
-		"bookmarks": number // string: "0" or "1"
+		"bookmarks": number
 	}
 };
 
@@ -88,7 +95,37 @@ export type ChangeStorageModeResponse = {
 	readonly error?: string;
 };
 
-export type Messages = ActivateMessage | InitMessage | UpdateMessage | StartSequentialQueueMessage | StopSequentialQueueMessage | CreateLazyTabsMessage | ChangeStorageModeMessage;
+export type LinkManagerMessage =
+	| { readonly message: "linkManagerGetState" }
+	| { readonly message: "linkManagerInspectDuplicates"; readonly urls: readonly { readonly url: string; readonly title: string }[] }
+	| { readonly message: "linkManagerAddLinks"; readonly request: LinkManagerAddLinksRequest }
+	| { readonly message: "linkManagerAddList"; readonly name: string }
+	| { readonly message: "linkManagerSetActiveList"; readonly listId: string }
+	| { readonly message: "linkManagerSetMode"; readonly mode: LinkManagerQueueMode }
+	| { readonly message: "linkManagerSetViewMode"; readonly viewMode: LinkManagerViewMode }
+	| { readonly message: "linkManagerSetBatchSize"; readonly batchSize: number }
+	| { readonly message: "linkManagerSetOpenOnSingleClick"; readonly enabled: boolean }
+	| { readonly message: "linkManagerSetReadStatus"; readonly itemId: string; readonly readStatus: LinkManagerReadStatus }
+	| { readonly message: "linkManagerRemoveItem"; readonly itemId: string }
+	| { readonly message: "linkManagerStageNext" }
+	| { readonly message: "linkManagerTogglePause" }
+	| { readonly message: "linkManagerOpenItem"; readonly itemId: string };
+
+export type LinkManagerInspectDuplicatesResponse = {
+	readonly ok: boolean;
+	readonly duplicates?: Record<string, LinkManagerTabDuplicate[]>;
+	readonly error?: string;
+};
+
+export type Messages =
+	| ActivateMessage
+	| InitMessage
+	| UpdateMessage
+	| StartSequentialQueueMessage
+	| StopSequentialQueueMessage
+	| CreateLazyTabsMessage
+	| ChangeStorageModeMessage
+	| LinkManagerMessage;
 
 export type InitResponse = Settings & {
 	error?: string;

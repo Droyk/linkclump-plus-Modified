@@ -29,7 +29,9 @@ Mode changes never close currently open tabs. The new mode governs later repleni
 
 A link is stored once and belongs to one named collection (for example Inbox, Research, or Shopping). Each queue staging operation may assign a batch ID. The sidebar's Combined and Collections views are presentations of the same data; changing the view does not copy or split links.
 
-The sidebar accepts one URL per line. A line may use `Title<TAB>URL`; otherwise the URL is also used as its title.
+The sidebar accepts one URL per line. A line may use `Title<TAB>URL`; otherwise the URL is also used as its title. The panel can switch between a combined queue view and a collections-grouped view without copying the underlying records. By default a row click selects, Enter/double-click opens, Ctrl/Shift modifiers select ranges, Ctrl+A selects visible rows, and Escape clears the selection. A setting enables immediate single-click opening.
+
+Default keyboard shortcuts are Alt+Shift+L to open the panel, Alt+Shift+P to pause/resume, and Alt+Shift+M to cycle A → B → C → D. Browser shortcut conflicts can be changed in the browser's extension-shortcuts page.
 
 ## Duplicate tabs
 

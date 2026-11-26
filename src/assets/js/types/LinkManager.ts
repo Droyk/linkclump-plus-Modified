@@ -29,6 +29,7 @@ export interface LinkManagerItem {
 	readonly tabKind: LinkManagerTabKind;
 	readonly tabId: number | null;
 	readonly managed: boolean;
+	readonly tabToken?: string;
 	readonly addedAt: number;
 	readonly viewedAt: number | null;
 	readonly tabToken?: string;
@@ -40,6 +41,7 @@ export interface LinkManagerState {
 	readonly mode: LinkManagerQueueMode;
 	readonly viewMode: LinkManagerViewMode;
 	readonly batchSize: number;
+	readonly openOnSingleClick: boolean;
 	readonly activeListId: string;
 	readonly activeBatchId: string | null;
 	readonly nextBatchNumber: number;
