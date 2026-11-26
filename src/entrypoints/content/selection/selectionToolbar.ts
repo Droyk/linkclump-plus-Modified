@@ -297,7 +297,7 @@ function runAction(store: LinkSelectionStore, action: "copy" | "copy-json" | "ta
 			setting = { action: "tabs", options: { block: true, reverse: false, end: false, delay: 0, close: 0 } };
 			break;
 		case "bm":
-			setting = { action: "bm", options: { block: true, reverse: false, bookmarks: 1 } };
+			setting = { action: "bm", options: { block: true, reverse: false, bookmarks: 0 } };
 			break;
 	}
 

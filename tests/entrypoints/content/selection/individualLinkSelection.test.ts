@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LINK_SELECTION_SETTINGS } from "@/assets/js/constants/setting";
+import { OS_LINUX, OS_WIN } from "@/assets/js/constants/os";
 import {
 	cancelIndividualSelection,
 	individualKeyDown,
@@ -82,6 +83,29 @@ describe("individualLinkSelection", () => {
 
 		vi.advanceTimersByTime(1);
 		expect(window.linkSelection.size).toBe(1);
+	});
+
+\tit("arms right-click context-menu suppression on Linux before the hold timer", () => {
+		const link = makeLink();
+		window.os = OS_LINUX;
+
+		expect(individualPointerDown(makePointerEvent("pointerdown", link, { button: 2, shiftKey: true }))).toBe(true);
+		expect(window.stop_menu).toBe(true);
+		expect(shouldSuppressIndividualContextMenu()).toBe(true);
+
+		const up = makePointerEvent("pointerup", link, { button: 2, shiftKey: false });
+		individualPointerUp(up);
+		expect(window.stop_menu).toBe(false);
+		expect(window.linkSelection.size).toBe(0);
+	});
+
+	it("does not suppress the Windows native menu for a short right-click", () => {
+		const link = makeLink();
+		window.os = OS_WIN;
+
+		expect(individualPointerDown(makePointerEvent("pointerdown", link, { button: 2, shiftKey: true }))).toBe(true);
+		expect(window.stop_menu).toBe(false);
+		expect(shouldSuppressIndividualContextMenu()).toBe(false);
 	});
 
 	it("keeps a short press as a normal click and does not select", () => {

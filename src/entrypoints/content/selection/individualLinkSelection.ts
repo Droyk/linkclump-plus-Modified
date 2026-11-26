@@ -60,6 +60,13 @@ export function individualPointerDown(event: PointerEvent): boolean {
 	};
 	pending = gesture;
 
+	// On Linux and macOS the native context menu may be dispatched on pointer-down.
+	// Arm suppression synchronously for matching right-button gestures, including short
+	// presses; Windows can defer the decision until the hold actually activates.
+	if (event.button === 2 && window.os !== OS_WIN) {
+		window.stop_menu = true;
+	}
+
 	gesture.timerId = window.setTimeout(() => {
 		if (pending !== gesture || !gesture.element.isConnected) {
 			return;
