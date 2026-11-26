@@ -15,6 +15,8 @@ import { describe, afterEach, beforeEach, expect, vi } from "vitest";
 import { handleRequests } from "@/entrypoints/background/messaging/handleRequests";
 import { handleActivate } from "@/entrypoints/background/messaging/handleActivate";
 import { handleUpdateSettings } from "@/entrypoints/background/messaging/handleUpdateSettings";
+import { sequentialQueueManager } from "@/entrypoints/background/queue/SequentialQueueManager";
+import type { StartSequentialQueueMessage, StopSequentialQueueMessage } from "@/assets/js/types/Messages";
 import type { Deps } from "@/entrypoints/background/deps";
 import type { InitMessage, Messages } from "@/assets/js/types/Messages";
 import type { Browser } from "wxt/browser";
@@ -23,6 +25,12 @@ import { type IntentionalAnyForValidation } from "../../../shared/types";
 
 vi.mock("@/entrypoints/background/messaging/handleActivate", () => ({ handleActivate: vi.fn() }));
 vi.mock("@/entrypoints/background/messaging/handleUpdateSettings", () => ({ handleUpdateSettings: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/entrypoints/background/queue/SequentialQueueManager", () => ({
+	sequentialQueueManager: {
+		start: vi.fn().mockResolvedValue(true),
+		stop: vi.fn().mockResolvedValue(undefined)
+	}
+}));
 
 // =============================================================================
 // 1. Test Data (Separation of Data and Logic)
@@ -116,6 +124,8 @@ describe("handleRequests messaging protocol (H2 migration)", () => {
 		context = createContext();
 		vi.mocked(handleActivate).mockClear();
 		vi.mocked(handleUpdateSettings).mockClear();
+		vi.mocked(sequentialQueueManager.start).mockClear();
+		vi.mocked(sequentialQueueManager.stop).mockClear();
 		vi.spyOn(console, "error").mockImplementation(() => {});
 	});
 
@@ -158,6 +168,44 @@ describe("handleRequests messaging protocol (H2 migration)", () => {
 			await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledTimes(1));
 
 			return { responseArgs: sendResponse.mock.calls[0], loadCalls: loadMock.mock.calls.length };
+		});
+	});
+
+
+	describe("Sequential queue acknowledgements", () => {
+		it("keeps the message channel open and acknowledges a successful queue start", async () => {
+			const request: StartSequentialQueueMessage = {
+				message: "startSequentialQueue",
+				urls: [ { url: "https://example.com/a", title: "A" } ]
+			};
+			vi.mocked(sequentialQueueManager.start).mockResolvedValueOnce(true);
+			const sender = { ...DUMMY_SENDER, tab: { id: 44 } } as Browser.runtime.MessageSender;
+
+			const returned = handleRequests(request, sender, context.sendResponse, context.deps);
+
+			expect(returned).toBe(true);
+			await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalledWith({ ok: true }));
+			expect(sequentialQueueManager.start).toHaveBeenCalledWith(request.urls, 44, true);
+		});
+
+		it("reports a queue-start rejection as ok false", async () => {
+			const request: StartSequentialQueueMessage = {
+				message: "startSequentialQueue",
+				urls: [ { url: "https://example.com/a", title: "A" } ]
+			};
+			vi.mocked(sequentialQueueManager.start).mockResolvedValueOnce(false);
+			const sender = { ...DUMMY_SENDER, tab: { id: 44 } } as Browser.runtime.MessageSender;
+
+			expect(handleRequests(request, sender, context.sendResponse, context.deps)).toBe(true);
+			await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalledWith({ ok: false }));
+		});
+
+		it("acknowledges cancellation of a sequential queue", async () => {
+			const request: StopSequentialQueueMessage = { message: "stopSequentialQueue" };
+
+			expect(handleRequests(request, DUMMY_SENDER, context.sendResponse, context.deps)).toBe(true);
+			await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalledWith({ ok: true }));
+			expect(sequentialQueueManager.stop).toHaveBeenCalledTimes(1);
 		});
 	});
 

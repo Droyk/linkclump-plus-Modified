@@ -66,6 +66,10 @@ export type StopSequentialQueueMessage = {
 	"message": "stopSequentialQueue";
 };
 
+export type SequentialQueueCommandResponse = {
+	readonly ok: boolean;
+};
+
 export type CreateLazyTabsMessage = {
 	"message": "createLazyTabs";
 	"urls": { url: string; title: string }[];

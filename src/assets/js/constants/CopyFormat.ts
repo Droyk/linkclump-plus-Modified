@@ -8,7 +8,7 @@ import type { CopyFormat } from "@/assets/js/types/Settings";
  * or Markdown) when copied links are placed onto the clipboard.
  *
  * Note on assigned values:
- * The assigned numeric values (0 through 6) serve purely as classification identifiers
+ * The assigned numeric values (0 through 7) serve purely as classification identifiers
  * in internal logic (such as option selection indexes and background
  * dispatch branching), and do not convey arithmetic magnitude or semantic order.
  */

@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { safeAsync } from "@/assets/js/lib/safeAsync";
-import type { ActivateMessage, CreateLazyTabsMessage } from "@/assets/js/types/Messages";
+import type { ActivateMessage, CreateLazyTabsMessage, SequentialQueueCommandResponse, StartSequentialQueueMessage, StopSequentialQueueMessage } from "@/assets/js/types/Messages";
+import type { CopyFormat } from "@/assets/js/types/Settings";
 import type { LinkSelectionStore } from "./LinkSelectionStore";
 
 const HOST_ID = "linkclump-selection-manager";
@@ -54,7 +55,12 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 		"<section class=\"panel\" role=\"region\" aria-label=\"Selected links\">",
 		"<header><strong>Link collection <span id=\"count\">(0)</span></strong><button id=\"collapse\" type=\"button\" aria-expanded=\"true\" title=\"Collapse collection\">−</button></header>",
 		"<div id=\"rows\" aria-live=\"polite\"></div>",
-		"<footer><button id=\"copy\" type=\"button\" class=\"primary\">Copy URLs</button><button id=\"copy-json\" type=\"button\">Copy JSON</button><button id=\"open\" type=\"button\">Open tabs</button><button id=\"lazy\" type=\"button\" title=\"Create placeholder tabs; each destination loads only when activated\">Deferred tabs</button><label for=\"lazy-delay\">Gap (seconds)</label><input id=\"lazy-delay\" type=\"number\" min=\"0\" max=\"30\" step=\"0.5\" value=\"0\" /><button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"deduplicate\" type=\"button\">Remove duplicates</button><button id=\"clear\" type=\"button\">Clear</button></footer>",
+\t\t"<footer>",
+		"<label for=\"copy-format\">Copy format</label><select id=\"copy-format\"><option value=\"1\">URLs only</option><option value=\"0\">Titles + URLs</option><option value=\"2\">URLs space-separated</option><option value=\"3\">Titles only</option><option value=\"4\">HTML link</option><option value=\"5\">HTML list</option><option value=\"6\">Markdown</option><option value=\"7\">JSON</option></select><button id=\"copy\" type=\"button\" class=\"primary\">Copy</button>",
+		"<button id=\"open\" type=\"button\">Open tabs</button><button id=\"sequential\" type=\"button\" title=\"Open one link at a time; close the current queue tab to open the next\">Open sequentially</button><button id=\"stop-sequential\" type=\"button\">Stop queue</button>",
+		"<button id=\"lazy\" type=\"button\" title=\"Create placeholder tabs; each destination loads only when activated\">Deferred tabs</button><label for=\"lazy-delay\">Gap (seconds)</label><input id=\"lazy-delay\" type=\"number\" min=\"0\" max=\"30\" step=\"0.5\" value=\"0\" />",
+		"<button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"deduplicate\" type=\"button\">Remove duplicates</button><button id=\"clear\" type=\"button\">Clear</button>",
+		"<span id=\"action-status\" role=\"status\" aria-live=\"polite\"></span></footer>",
 		"</section>"
 	].join("");
 
@@ -65,8 +71,11 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	const rows = shadow.querySelector<HTMLElement>("#rows");
 	const count = shadow.querySelector<HTMLElement>("#count");
 	const copy = shadow.querySelector<HTMLButtonElement>("#copy");
-	const copyJson = shadow.querySelector<HTMLButtonElement>("#copy-json");
+	const copyFormat = shadow.querySelector<HTMLSelectElement>("#copy-format");
 	const open = shadow.querySelector<HTMLButtonElement>("#open");
+	const sequential = shadow.querySelector<HTMLButtonElement>("#sequential");
+	const stopSequential = shadow.querySelector<HTMLButtonElement>("#stop-sequential");
+	const actionStatus = shadow.querySelector<HTMLElement>("#action-status");
 	const lazy = shadow.querySelector<HTMLButtonElement>("#lazy");
 	const lazyDelay = shadow.querySelector<HTMLInputElement>("#lazy-delay");
 	const bookmark = shadow.querySelector<HTMLButtonElement>("#bookmark");
@@ -74,9 +83,15 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	const clear = shadow.querySelector<HTMLButtonElement>("#clear");
 	const collapse = shadow.querySelector<HTMLButtonElement>("#collapse");
 
-	copy?.addEventListener("click", () => runAction(store, "copy"));
-	copyJson?.addEventListener("click", () => runAction(store, "copy-json"));
+	copy?.addEventListener("click", () => {
+		const selectedFormat = Number(copyFormat?.value ?? "1");
+		if (isCopyFormat(selectedFormat)) {
+			runAction(store, "copy", selectedFormat);
+		}
+	});
 	open?.addEventListener("click", () => runAction(store, "tabs"));
+	sequential?.addEventListener("click", () => startSequentialQueue(store, actionStatus));
+	stopSequential?.addEventListener("click", () => stopSequentialQueue(actionStatus));
 	lazy?.addEventListener("click", () => startLazyTabs(store, lazyDelay));
 	bookmark?.addEventListener("click", () => runAction(store, "bm"));
 	deduplicate?.addEventListener("click", () => removeDuplicateEntries(store));
@@ -92,15 +107,16 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	});
 
 	const render = (): void => {
-		if (!rows || !count || !copy || !copyJson || !open || !lazy || !bookmark || !deduplicate || !clear) {
+		if (!rows || !count || !copy || !copyFormat || !open || !sequential || !stopSequential || !lazy || !bookmark || !deduplicate || !clear) {
 			return;
 		}
 
 		const entries = store.getEntries();
 		count.textContent = "(" + entries.length + ")";
 		copy.disabled = entries.length === 0;
-		copyJson.disabled = entries.length === 0;
+		copyFormat.disabled = entries.length === 0;
 		open.disabled = entries.length === 0;
+		sequential.disabled = entries.length === 0;
 		lazy.disabled = entries.length === 0;
 		bookmark.disabled = entries.length === 0;
 		deduplicate.disabled = entries.length < 2;
@@ -325,7 +341,61 @@ function removeDuplicateEntries(store: LinkSelectionStore): void {
 	}
 }
 
-function runAction(store: LinkSelectionStore, action: "copy" | "copy-json" | "tabs" | "bm"): void {
+
+function isCopyFormat(value: number): value is CopyFormat {
+	return Number.isInteger(value) && value >= 0 && value <= 7;
+}
+
+function startSequentialQueue(store: LinkSelectionStore, status: HTMLElement | null): void {
+	const entries = store.getEntries();
+	if (entries.length === 0) {
+		return;
+	}
+
+	const request: StartSequentialQueueMessage = {
+		message: "startSequentialQueue",
+		urls: entries.map(({ url, title }) => ({ url, title })),
+		blockDuplicates: true
+	};
+
+	safeAsync("startSequentialQueue", async () => {
+		try {
+			const response = await browser.runtime.sendMessage(request) as SequentialQueueCommandResponse | undefined;
+			if (status) {
+				status.textContent = response?.ok === true
+					? "Sequential queue started. Close the current queue tab to open the next."
+					: "Could not start the queue. Keep the source tab open and check that it still exists.";
+			}
+		} catch (error) {
+			if (status) {
+				status.textContent = "Could not start the sequential queue.";
+			}
+			throw error;
+		}
+	}, "content");
+}
+
+function stopSequentialQueue(status: HTMLElement | null): void {
+	const request: StopSequentialQueueMessage = { message: "stopSequentialQueue" };
+
+	safeAsync("stopSequentialQueue", async () => {
+		try {
+			const response = await browser.runtime.sendMessage(request) as SequentialQueueCommandResponse | undefined;
+			if (status) {
+				status.textContent = response?.ok === true
+					? "Queue stopped. The already-open queue tab was left open."
+					: "Could not stop the queue.";
+			}
+		} catch (error) {
+			if (status) {
+				status.textContent = "Could not stop the queue.";
+			}
+			throw error;
+		}
+	}, "content");
+}
+
+function runAction(store: LinkSelectionStore, action: "copy" | "tabs" | "bm", copyFormat: CopyFormat = 1): void {
 	const entries = store.getEntries();
 	if (entries.length === 0) {
 		return;
@@ -336,10 +406,7 @@ function runAction(store: LinkSelectionStore, action: "copy" | "copy-json" | "ta
 
 	switch (action) {
 		case "copy":
-			setting = { action: "copy", options: { block: true, reverse: false, copy: 1 } };
-			break;
-		case "copy-json":
-			setting = { action: "copy", options: { block: true, reverse: false, copy: 7 } };
+			setting = { action: "copy", options: { block: true, reverse: false, copy: copyFormat } };
 			break;
 		case "tabs":
 			setting = { action: "tabs", options: { block: true, reverse: false, end: false, delay: 0, close: 0 } };
