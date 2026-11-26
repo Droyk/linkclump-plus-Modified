@@ -165,8 +165,8 @@ export class LinkManagerService {
 		this.tabs.onActivated.addListener(({ tabId }) => {
 			void this.serialize(() => this.handleTabActivated(tabId)).catch(reportManagerError);
 		});
-		this.tabs.onRemoved.addListener((tabId) => {
-			void this.serialize(() => this.handleTabRemoved(tabId)).catch(reportManagerError);
+		this.tabs.onRemoved.addListener((tabId, removeInfo) => {
+			void this.serialize(() => this.handleTabRemoved(tabId, removeInfo)).catch(reportManagerError);
 		});
 		this.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 			if (changeInfo.url !== undefined) {
@@ -321,7 +321,7 @@ export class LinkManagerService {
 
 	addLinks(request: LinkManagerAddLinksRequest): Promise<LinkManagerState> {
 		return this.serialize(async () => {
-			const state = await this.readState();
+			let state = await this.readState();
 			const listId = request.listId ?? state.activeListId;
 			if (!state.lists.some((list) => list.id === listId)) {
 				throw new Error("The selected collection no longer exists.");
@@ -331,6 +331,8 @@ export class LinkManagerService {
 			const nextItems: LinkManagerItem[] = [];
 			const seenInput = new Set<string>();
 			let nextOrder = state.items.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+			let activatedManagedDuplicate = false;
+			let replacedManagedDuplicate = false;
 
 			for (const raw of request.urls) {
 				if (typeof raw?.url !== "string" || typeof raw.title !== "string") {
@@ -353,6 +355,32 @@ export class LinkManagerService {
 					externalTab = matches.find((tab) => tab.id === decision.tabId);
 					if (!externalTab) {
 						throw new Error("The selected duplicate tab is no longer open. Review duplicates again.");
+					}
+					const managedItem = state.items.find((item) => item.managed && item.tabId === decision.tabId);
+					if (decision.action === "activate" && managedItem) {
+						// Reuse the existing Link Manager record instead of creating two records
+						// that both claim the same browser tab.
+						await this.tabs.update(decision.tabId, { active: true });
+						activatedManagedDuplicate = true;
+						continue;
+					}
+					if (decision.action === "replace" && managedItem) {
+						const previousState = state;
+						state = {
+							...state,
+							items: state.items.map((item) => item.id === managedItem.id
+								? { ...item, tabId: null, queueStatus: "queued", tabKind: null, tabToken: undefined }
+								: item)
+						};
+						await this.writeState(state);
+						try {
+							await this.tabs.remove(decision.tabId);
+						} catch (error) {
+							await this.writeState(previousState);
+							throw error;
+						}
+						replacedManagedDuplicate = true;
+						continue;
 					}
 					if (decision.action === "activate") {
 						await this.tabs.update(decision.tabId, { active: true });
@@ -380,17 +408,16 @@ export class LinkManagerService {
 				nextItems.push(item);
 			}
 
-			if (nextItems.length === 0) {
+			if (nextItems.length === 0 && !activatedManagedDuplicate && !replacedManagedDuplicate) {
 				throw new Error("No valid HTTP, HTTPS, FTP, or file URLs were supplied.");
 			}
 
-			let next: LinkManagerState = {
-				...state,
-				items: [ ...state.items, ...nextItems ]
-			};
+			let next: LinkManagerState = nextItems.length > 0
+				? { ...state, items: [ ...state.items, ...nextItems ] }
+				: state;
 			await this.writeState(next);
-			if (next.mode !== "manual") {
-				await this.stageQueued(next, "automatic");
+			if (next.mode !== "manual" || replacedManagedDuplicate) {
+				await this.stageQueued(next, next.mode === "manual" ? "manual" : "automatic");
 				next = await this.readState();
 			}
 			return structuredClone(next);
@@ -794,7 +821,10 @@ export class LinkManagerService {
 		}
 	}
 
-	private async handleTabRemoved(tabId: number): Promise<void> {
+	private async handleTabRemoved(
+		tabId: number,
+		removeInfo?: { readonly isWindowClosing: boolean }
+	): Promise<void> {
 		let state = await this.readState();
 		const item = state.items.find((candidate) => candidate.tabId === tabId);
 		if (!item) {
@@ -819,7 +849,7 @@ export class LinkManagerService {
 			}
 		}
 		await this.writeState(state);
-		if (item.managed && state.mode !== "manual") {
+		if (item.managed && state.mode !== "manual" && removeInfo?.isWindowClosing !== true) {
 			await this.stageQueued(state, "automatic");
 		}
 	}

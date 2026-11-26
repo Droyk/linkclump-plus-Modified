@@ -42,7 +42,7 @@ The user chooses one of two actions:
 1. **Activate existing tab**: activate the selected matching tab. It is recorded as externally open and is not claimed by Link Manager. Pause will not close it.
 2. **Close it and open a managed replacement**: close the selected matching tab and queue a new Link Manager tab. The replacement is created at the end of the tab strip rather than reusing the previous tab's position.
 
-There is no automatic takeover. Existing tabs and tabs owned/managed by other extensions are untouched unless the user explicitly selects one of these duplicate actions.
+There is no automatic takeover. If the matching tab is already controlled by Link Manager, activating it focuses the existing record rather than creating a second record that claims the same tab; choosing replacement requeues that existing record. Existing tabs and tabs owned/managed by other extensions are untouched unless the user explicitly selects one of these duplicate actions. Closing a browser window does not trigger automatic refill during its tab-removal events.
 
 ## Pause and resume
 

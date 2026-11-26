@@ -15,7 +15,7 @@ interface FakeEnvironment {
 	readonly storageValues: Record<string, unknown>;
 	readonly removeListeners: ((tabId: number, info: { windowId: number; isWindowClosing: boolean }) => void)[];
 	activate(tabId: number): Promise<void>;
-	remove(tabId: number): Promise<void>;
+	remove(tabId: number, isWindowClosing?: boolean): Promise<void>;
 	state(): Promise<LinkManagerState>;
 }
 
@@ -109,11 +109,11 @@ function createEnvironment(initialTabs: LinkManagerTabInfo[] = []): FakeEnvironm
 			activateListeners.forEach((listener) => listener({ tabId, windowId: tab.windowId }));
 			await service.getState();
 		},
-		async remove(tabId) {
+		async remove(tabId, isWindowClosing = false) {
 			const tab = tabs.get(tabId);
 			if (!tab) return;
 			tabs.delete(tabId);
-			removeListeners.forEach((listener) => listener(tabId, { windowId: tab.windowId, isWindowClosing: false }));
+			removeListeners.forEach((listener) => listener(tabId, { windowId: tab.windowId, isWindowClosing }));
 			await service.getState();
 		},
 		state: () => service.getState()
@@ -336,6 +336,64 @@ describe("LinkManagerService", () => {
 		await env.service.removeItem(state.items[0]!.id);
 		expect(env.tabs.has(tabId)).toBe(false);
 		expect((await env.state()).items).toHaveLength(0);
+	});
+
+	it("activates an already-managed duplicate without creating a second record for the same tab", async () => {
+		const env = createEnvironment();
+		const original = await env.service.addLinks({
+			urls: [{ url: "https://example.com/managed-duplicate", title: "Tracked" }]
+		});
+		const originalItem = original.items[0]!;
+		const tabId = originalItem.tabId!;
+		const tab = env.tabs.get(tabId)!;
+		env.tabs.set(tabId, { ...tab, url: originalItem.url, title: originalItem.title });
+
+		const duplicates = await env.service.inspectDuplicates([{ url: originalItem.url, title: originalItem.title }]);
+		expect(duplicates[originalItem.url]?.[0]?.managed).toBe(true);
+		const state = await env.service.addLinks({
+			urls: [{ url: originalItem.url, title: originalItem.title }],
+			duplicateActions: [{ url: originalItem.url, tabId, action: "activate" }]
+		});
+
+		expect(state.items).toHaveLength(1);
+		expect(state.items[0]).toMatchObject({ id: originalItem.id, tabId, managed: true });
+		expect(env.creates).toHaveLength(1);
+	});
+
+	it("replaces an already-managed duplicate by reopening the existing record", async () => {
+		const env = createEnvironment();
+		const original = await env.service.addLinks({
+			urls: [{ url: "https://example.com/managed-replace", title: "Tracked" }]
+		});
+		const originalItem = original.items[0]!;
+		const oldTabId = originalItem.tabId!;
+		const tab = env.tabs.get(oldTabId)!;
+		env.tabs.set(oldTabId, { ...tab, url: originalItem.url, title: originalItem.title });
+
+		const state = await env.service.addLinks({
+			urls: [{ url: originalItem.url, title: originalItem.title }],
+			duplicateActions: [{ url: originalItem.url, tabId: oldTabId, action: "replace" }]
+		});
+		expect(state.items).toHaveLength(1);
+		expect(state.items[0]!.id).toBe(originalItem.id);
+		expect(state.items[0]!.tabId).not.toBeNull();
+		expect(state.items[0]!.tabId).not.toBe(oldTabId);
+	});
+
+	it("does not immediately replenish tabs when a browser window is being closed", async () => {
+		const env = createEnvironment();
+		await env.service.addLinks({
+			urls: [ "a", "b", "c", "d", "e" ].map((letter) => ({
+				url: "https://example.com/window-close/" + letter,
+				title: letter
+			}))
+		});
+		const before = await env.state();
+		const firstTabId = before.items[0]!.tabId!;
+		await env.remove(firstTabId, true);
+		const after = await env.state();
+		expect(env.creates).toHaveLength(4);
+		expect(after.items.find((item) => item.url.endsWith("/e"))?.tabId).toBeNull();
 	});
 
 });
