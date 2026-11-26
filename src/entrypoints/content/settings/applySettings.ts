@@ -22,6 +22,7 @@ import {
 	individualPointerUp
 } from "../selection/individualLinkSelection";
 import { createSelectionToolbar, destroySelectionToolbar } from "../selection/selectionToolbar";
+import { LinkSelectionStore } from "../selection/LinkSelectionStore";
 import { isBlockedUrl } from "./blocklist";
 
 import { CUSTOM_TAG_LINKCLUMP } from "@/assets/js/constants/ui";
@@ -81,6 +82,11 @@ function guarded<E extends Event>(listener: (event: E) => void): (event: E) => v
  * @returns {void}
  */
 export function applySettings(settings: Pick<Settings, "actions" | "blocked" | "selection">): void {
+	// Tests, future content entry points, and re-initialized frames can call this before
+	// the normal entrypoint has created the per-document store.
+	if (!window.linkSelection) {
+		window.linkSelection = new LinkSelectionStore();
+	}
 	window.settings = settings.actions;
 	window.linkSelectionSettings = {
 		...DEFAULT_LINK_SELECTION_SETTINGS,
