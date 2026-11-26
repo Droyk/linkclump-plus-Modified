@@ -371,5 +371,5 @@ function wait(milliseconds: number): Promise<void> {
 export const lazyTabManager = new LazyTabManager(
 	browser.tabs as unknown as LazyTabsAdapter,
 	browser.storage.local as unknown as LazyStorageAdapter,
-	(token) => browser.runtime.getURL(LAZY_TAB_PATH + "?token=" + encodeURIComponent(token))
+	(token) => browser.runtime.getURL(`/lazyTab.html?token=${encodeURIComponent(token)}`)
 );
