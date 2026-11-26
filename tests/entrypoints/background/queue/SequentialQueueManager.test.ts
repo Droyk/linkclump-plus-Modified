@@ -174,7 +174,7 @@ describe("SequentialQueueManager", () => {
 			},
 			{
 				get: async (key) => ({ [key]: state.storage[key] }),
-				set: async (items) => Object.assign(state.storage, items),
+				set: async (items) => { Object.assign(state.storage, items); },
 				remove: async (key) => { delete state.storage[key]; }
 			}
 		);
@@ -207,7 +207,7 @@ describe("SequentialQueueManager", () => {
 			},
 			{
 				get: async (key) => ({ [key]: state.storage[key] }),
-				set: async (items) => Object.assign(state.storage, items),
+				set: async (items) => { Object.assign(state.storage, items); },
 				remove: async (key) => { delete state.storage[key]; }
 			}
 		);
