@@ -277,8 +277,6 @@ function initEvent() {
 }
 
 
-
-
 /**
  * Populates and wires the independent persistent-link-collection preferences.
  * These preferences are optional in older settings files and are merged with defaults
