@@ -55,7 +55,7 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 		"<section class=\"panel\" role=\"region\" aria-label=\"Selected links\">",
 		"<header><strong>Link collection <span id=\"count\">(0)</span></strong><button id=\"collapse\" type=\"button\" aria-expanded=\"true\" title=\"Collapse collection\">−</button></header>",
 		"<div id=\"rows\" aria-live=\"polite\"></div>",
-\t\t"<footer>",
+		"<footer>",
 		"<label for=\"copy-format\">Copy format</label><select id=\"copy-format\"><option value=\"1\">URLs only</option><option value=\"0\">Titles + URLs</option><option value=\"2\">URLs space-separated</option><option value=\"3\">Titles only</option><option value=\"4\">HTML link</option><option value=\"5\">HTML list</option><option value=\"6\">Markdown</option><option value=\"7\">JSON</option></select><button id=\"copy\" type=\"button\" class=\"primary\">Copy</button>",
 		"<button id=\"open\" type=\"button\">Open tabs</button><button id=\"sequential\" type=\"button\" title=\"Open one link at a time; close the current queue tab to open the next\">Open sequentially</button><button id=\"stop-sequential\" type=\"button\">Stop queue</button>",
 		"<button id=\"lazy\" type=\"button\" title=\"Create placeholder tabs; each destination loads only when activated\">Deferred tabs</button><label for=\"lazy-delay\">Gap (seconds)</label><input id=\"lazy-delay\" type=\"number\" min=\"0\" max=\"30\" step=\"0.5\" value=\"0\" />",
