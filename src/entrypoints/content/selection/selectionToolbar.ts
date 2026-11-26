@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser";
 import { safeAsync } from "@/assets/js/lib/safeAsync";
-import type { ActivateMessage } from "@/assets/js/types/Messages";
+import type { ActivateMessage, CreateLazyTabsMessage } from "@/assets/js/types/Messages";
 import type { LinkSelectionStore } from "./LinkSelectionStore";
 
 const HOST_ID = "linkclump-selection-manager";
@@ -54,7 +54,7 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 		"<section class=\"panel\" role=\"region\" aria-label=\"Selected links\">",
 		"<header><strong>Link collection <span id=\"count\">(0)</span></strong><button id=\"collapse\" type=\"button\" aria-expanded=\"true\" title=\"Collapse collection\">−</button></header>",
 		"<div id=\"rows\" aria-live=\"polite\"></div>",
-		"<footer><button id=\"copy\" type=\"button\" class=\"primary\">Copy URLs</button><button id=\"copy-json\" type=\"button\">Copy JSON</button><button id=\"open\" type=\"button\">Open tabs</button><button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"clear\" type=\"button\">Clear</button></footer>",
+		"<footer><button id=\"copy\" type=\"button\" class=\"primary\">Copy URLs</button><button id=\"copy-json\" type=\"button\">Copy JSON</button><button id=\"open\" type=\"button\">Open tabs</button><button id=\"lazy\" type=\"button\" title=\"Create placeholder tabs; each destination loads only when activated\">Deferred tabs</button><label for=\"lazy-delay\">Gap (seconds)</label><input id=\"lazy-delay\" type=\"number\" min=\"0\" max=\"30\" step=\"0.5\" value=\"0\" /><button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"deduplicate\" type=\"button\">Remove duplicates</button><button id=\"clear\" type=\"button\">Clear</button></footer>",
 		"</section>"
 	].join("");
 
@@ -67,14 +67,19 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	const copy = shadow.querySelector<HTMLButtonElement>("#copy");
 	const copyJson = shadow.querySelector<HTMLButtonElement>("#copy-json");
 	const open = shadow.querySelector<HTMLButtonElement>("#open");
+	const lazy = shadow.querySelector<HTMLButtonElement>("#lazy");
+	const lazyDelay = shadow.querySelector<HTMLInputElement>("#lazy-delay");
 	const bookmark = shadow.querySelector<HTMLButtonElement>("#bookmark");
+	const deduplicate = shadow.querySelector<HTMLButtonElement>("#deduplicate");
 	const clear = shadow.querySelector<HTMLButtonElement>("#clear");
 	const collapse = shadow.querySelector<HTMLButtonElement>("#collapse");
 
 	copy?.addEventListener("click", () => runAction(store, "copy"));
 	copyJson?.addEventListener("click", () => runAction(store, "copy-json"));
 	open?.addEventListener("click", () => runAction(store, "tabs"));
+	lazy?.addEventListener("click", () => startLazyTabs(store, lazyDelay));
 	bookmark?.addEventListener("click", () => runAction(store, "bm"));
+	deduplicate?.addEventListener("click", () => removeDuplicateEntries(store));
 	clear?.addEventListener("click", () => store.clear());
 	collapse?.addEventListener("click", () => {
 		if (!panel || !collapse) {
@@ -87,7 +92,7 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	});
 
 	const render = (): void => {
-		if (!rows || !count || !copy || !copyJson || !open || !bookmark || !clear) {
+		if (!rows || !count || !copy || !copyJson || !open || !lazy || !bookmark || !deduplicate || !clear) {
 			return;
 		}
 
@@ -96,7 +101,9 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 		copy.disabled = entries.length === 0;
 		copyJson.disabled = entries.length === 0;
 		open.disabled = entries.length === 0;
+		lazy.disabled = entries.length === 0;
 		bookmark.disabled = entries.length === 0;
+		deduplicate.disabled = entries.length < 2;
 		clear.disabled = entries.length === 0;
 
 		const liveIds = new Set(entries.map((entry) => entry.id));
@@ -275,6 +282,47 @@ function moveEntry(store: LinkSelectionStore, id: string, offset: -1 | 1): void 
 	}
 	ids.splice(nextIndex, 0, movedId);
 	store.reorder(ids);
+}
+
+function startLazyTabs(store: LinkSelectionStore, delayInput: HTMLInputElement | null): void {
+	const entries = store.getEntries();
+	if (entries.length === 0) {
+		return;
+	}
+
+	const seconds = Number(delayInput?.value ?? "0");
+	if (!Number.isFinite(seconds) || seconds < 0 || seconds > 30) {
+		if (delayInput) {
+			delayInput.setCustomValidity("Choose a delay between 0 and 30 seconds.");
+			delayInput.reportValidity();
+		}
+		return;
+	}
+
+	delayInput?.setCustomValidity("");
+	const urls = entries.map(({ url, title }) => ({ url, title }));
+	const delayMs = Math.round(seconds * 1000);
+	safeAsync(
+		"createLazyTabs",
+		() => browser.runtime.sendMessage({
+			message: "createLazyTabs",
+			urls,
+			delayMs,
+			blockDuplicates: true
+		} satisfies CreateLazyTabsMessage),
+		"content"
+	);
+}
+
+function removeDuplicateEntries(store: LinkSelectionStore): void {
+	const seen = new Set<string>();
+	for (const entry of store.getEntries()) {
+		if (seen.has(entry.url)) {
+			store.remove(entry.id);
+		} else {
+			seen.add(entry.url);
+		}
+	}
 }
 
 function runAction(store: LinkSelectionStore, action: "copy" | "copy-json" | "tabs" | "bm"): void {

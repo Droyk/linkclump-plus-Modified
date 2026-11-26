@@ -11,6 +11,7 @@ import { safeAsync } from "@/assets/js/lib/safeAsync";
 import { handleActivate } from "./handleActivate";
 import { handleUpdateSettings } from "./handleUpdateSettings";
 import { sequentialQueueManager } from "../queue/SequentialQueueManager";
+import { lazyTabManager } from "../queue/LazyTabManager";
 
 import type {
 	ActivateMessage,
@@ -50,6 +51,14 @@ export function handleRequests(
 		}
 		case "stopSequentialQueue": {
 			safeAsync("stopSequentialQueue", () => sequentialQueueManager.stop(), "background");
+			return false;
+		}
+		case "createLazyTabs": {
+			safeAsync(
+				"createLazyTabs",
+				() => lazyTabManager.create(request.urls, sender.tab?.id, request.delayMs ?? 0, request.blockDuplicates ?? true),
+				"background"
+			);
 			return false;
 		}
 		case "init": {

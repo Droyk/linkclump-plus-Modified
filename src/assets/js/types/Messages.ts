@@ -66,6 +66,13 @@ export type StopSequentialQueueMessage = {
 	"message": "stopSequentialQueue";
 };
 
-export type Messages = ActivateMessage | InitMessage | UpdateMessage | StartSequentialQueueMessage | StopSequentialQueueMessage;
+export type CreateLazyTabsMessage = {
+	"message": "createLazyTabs";
+	"urls": { url: string; title: string }[];
+	"delayMs"?: number;
+	"blockDuplicates"?: boolean;
+};
+
+export type Messages = ActivateMessage | InitMessage | UpdateMessage | StartSequentialQueueMessage | StopSequentialQueueMessage | CreateLazyTabsMessage;
 
 export type InitResponse = Settings & { error?: string };
