@@ -85,7 +85,7 @@ describe("individualLinkSelection", () => {
 		expect(window.linkSelection.size).toBe(1);
 	});
 
-\tit("arms right-click context-menu suppression on Linux before the hold timer", () => {
+	it("arms right-click context-menu suppression on Linux before the hold timer", () => {
 		const link = makeLink();
 		window.os = OS_LINUX;
 
