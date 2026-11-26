@@ -95,6 +95,7 @@ function createEnvironment(initialTabs: LinkManagerTabInfo[] = []): FakeEnvironm
 		})(),
 		now: () => 100
 	});
+	service.register();
 
 	return {
 		tabs,
@@ -136,10 +137,9 @@ describe("LinkManagerService", () => {
 				{ url: "https://example.com/b", title: "B" }
 			]
 		});
-		expect(env.creates.map((entry) => entry.url)).toEqual([
-			"extension://lazyTab.html?token=id-2",
-			"extension://lazyTab.html?token=id-4"
-		]);
+		expect(env.creates.map((entry) => entry.url)).toEqual(
+			state.items.map((item) => "extension://lazyTab.html?token=" + item.tabToken)
+		);
 		expect(state.items.map((item) => item.queueStatus)).toEqual([ "staged", "staged" ]);
 		expect(state.items.every((item) => item.managed && item.tabId !== null)).toBe(true);
 	});
