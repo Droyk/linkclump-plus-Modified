@@ -10,6 +10,7 @@ import type { Browser } from "wxt/browser";
 import { safeAsync } from "@/assets/js/lib/safeAsync";
 import { handleActivate } from "./handleActivate";
 import { handleUpdateSettings } from "./handleUpdateSettings";
+import { sequentialQueueManager } from "../queue/SequentialQueueManager";
 
 import type {
 	ActivateMessage,
@@ -37,6 +38,18 @@ export function handleRequests(
 	switch (request.message) {
 		case "activate": {
 			safeAsync("handleActivate", () => handleActivate(request as ActivateMessage, sender), "background");
+			return false;
+		}
+		case "startSequentialQueue": {
+			safeAsync(
+				"startSequentialQueue",
+				() => sequentialQueueManager.start(request.urls, sender.tab?.id, request.blockDuplicates ?? true),
+				"background"
+			);
+			return false;
+		}
+		case "stopSequentialQueue": {
+			safeAsync("stopSequentialQueue", () => sequentialQueueManager.stop(), "background");
 			return false;
 		}
 		case "init": {

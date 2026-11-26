@@ -56,6 +56,16 @@ export type InitMessage = {
 	"message": "init",
 };
 
-export type Messages = ActivateMessage | InitMessage | UpdateMessage;
+export type StartSequentialQueueMessage = {
+	"message": "startSequentialQueue";
+	"urls": { url: string; title: string }[];
+	"blockDuplicates"?: boolean;
+};
+
+export type StopSequentialQueueMessage = {
+	"message": "stopSequentialQueue";
+};
+
+export type Messages = ActivateMessage | InitMessage | UpdateMessage | StartSequentialQueueMessage | StopSequentialQueueMessage;
 
 export type InitResponse = Settings & { error?: string };

@@ -197,7 +197,7 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 			dragHandle.className = "drag-handle";
 			dragHandle.textContent = "⋮⋮";
 			dragHandle.title = "Drag this row to reorder";
-		dragHandle.setAttribute("aria-hidden", "true");
+			dragHandle.setAttribute("aria-hidden", "true");
 
 			const moveUp = document.createElement("button");
 			moveUp.type = "button";

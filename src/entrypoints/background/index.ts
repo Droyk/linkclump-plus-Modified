@@ -7,6 +7,7 @@ import { handleRequests } from "./messaging/handleRequests";
 import { ContentScriptManager } from "./scripts/ContentScriptManager";
 import { SettingsManager } from "./settings/SettingsManager";
 import { StorageManager } from "./settings/StorageManager";
+import { sequentialQueueManager } from "./queue/SequentialQueueManager";
 
 import type { Deps } from "./deps";
 import type { Messages } from "@/assets/js/types/Messages";
@@ -27,6 +28,8 @@ const deps: Deps = {
  * @returns {void}
  */
 function main(): void {
+	sequentialQueueManager.register();
+	safeAsync("recoverSequentialQueue", () => sequentialQueueManager.recover(), "background");
 	browser.runtime.onMessage.addListener((request: Messages, sender, sendResponse) => handleRequests(request, sender, sendResponse, deps));
 
 	browser.action.onClicked.addListener(() => {
