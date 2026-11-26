@@ -95,7 +95,7 @@ export function applySettings(settings: Pick<Settings, "actions" | "blocked" | "
 			createSelectionToolbar(window.linkSelection);
 		} else {
 			destroySelectionToolbar();
-			window.linkSelection.clear();
+			window.linkSelection?.clear();
 		}
 	}
 }
