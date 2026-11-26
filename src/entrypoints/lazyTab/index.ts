@@ -1,5 +1,6 @@
 import { browser } from "wxt/browser";
-import { LAZY_TAB_ENTRY_PREFIX, type PendingLazyTab } from "@/entrypoints/background/queue/LazyTabManager";
+import { LAZY_TAB_ENTRY_PREFIX } from "@/assets/js/constants/lazyTab";
+import type { PendingLazyTab } from "@/assets/js/types/LazyTab";
 
 async function renderDeferredDestination(): Promise<void> {
 	const token = new URL(window.location.href).searchParams.get("token");

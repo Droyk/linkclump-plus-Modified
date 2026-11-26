@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { LAZY_TAB_ENTRY_PREFIX, LAZY_TAB_ID_PREFIX } from "@/assets/js/constants/lazyTab";
 import {
-	LAZY_TAB_ENTRY_PREFIX,
-	LAZY_TAB_ID_PREFIX,
 	LazyTabManager,
 	type LazyStorageAdapter,
 	type LazyTabInfo,

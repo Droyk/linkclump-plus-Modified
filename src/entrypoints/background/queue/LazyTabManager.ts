@@ -1,7 +1,7 @@
 import { browser } from "wxt/browser";
+import { LAZY_TAB_ENTRY_PREFIX, LAZY_TAB_ID_PREFIX } from "@/assets/js/constants/lazyTab";
+import type { PendingLazyTab } from "@/assets/js/types/LazyTab";
 
-export const LAZY_TAB_ENTRY_PREFIX = "linkclumpLazyTabEntry:" as const;
-export const LAZY_TAB_ID_PREFIX = "linkclumpLazyTabId:" as const;
 const LAZY_TAB_PATH = "/lazyTab.html" as const;
 const MAX_LAZY_TAB_DELAY_MS = 30_000;
 
@@ -36,13 +36,6 @@ export interface LazyStorageAdapter {
 	get(key: string | null): Promise<Record<string, unknown>>;
 	set(items: Record<string, unknown>): Promise<void>;
 	remove(keys: string | string[]): Promise<void>;
-}
-
-export interface PendingLazyTab {
-	readonly token: string;
-	readonly url: string;
-	readonly title: string;
-	readonly tabId: number | null;
 }
 
 export class LazyTabManager {
