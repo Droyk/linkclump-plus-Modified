@@ -33,6 +33,12 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 		"#rows { overflow:auto; min-height:0; padding:4px 10px; }",
 		".row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:7px 0; border-bottom:1px solid #edf0f2; }",
 		".row:last-child { border-bottom:0; }",
+		".row { cursor:grab; }",
+		".row.dragging { opacity:.4; }",
+		".row.drop-target { outline:2px dashed #2563eb; outline-offset:-2px; }",
+		".controls { display:flex; align-items:center; gap:3px; }",
+		".controls button { padding:3px 6px; }",
+		".drag-handle { color:#777; user-select:none; padding:0 2px; cursor:grab; }",
 		".title { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }",
 		".url { display:block; overflow-wrap:anywhere; color:#5f6368; font-size:11px; }",
 		".empty { color:#5f6368; padding:12px 2px; }",
@@ -48,7 +54,7 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 		"<section class=\"panel\" role=\"region\" aria-label=\"Selected links\">",
 		"<header><strong>Link collection <span id=\"count\">(0)</span></strong><button id=\"collapse\" type=\"button\" aria-expanded=\"true\" title=\"Collapse collection\">−</button></header>",
 		"<div id=\"rows\" aria-live=\"polite\"></div>",
-		"<footer><button id=\"copy\" type=\"button\" class=\"primary\">Copy URLs</button><button id=\"open\" type=\"button\">Open tabs</button><button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"clear\" type=\"button\">Clear</button></footer>",
+		"<footer><button id=\"copy\" type=\"button\" class=\"primary\">Copy URLs</button><button id=\"copy-json\" type=\"button\">Copy JSON</button><button id=\"open\" type=\"button\">Open tabs</button><button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"clear\" type=\"button\">Clear</button></footer>",
 		"</section>"
 	].join("");
 
@@ -59,12 +65,14 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	const rows = shadow.querySelector<HTMLElement>("#rows");
 	const count = shadow.querySelector<HTMLElement>("#count");
 	const copy = shadow.querySelector<HTMLButtonElement>("#copy");
+	const copyJson = shadow.querySelector<HTMLButtonElement>("#copy-json");
 	const open = shadow.querySelector<HTMLButtonElement>("#open");
 	const bookmark = shadow.querySelector<HTMLButtonElement>("#bookmark");
 	const clear = shadow.querySelector<HTMLButtonElement>("#clear");
 	const collapse = shadow.querySelector<HTMLButtonElement>("#collapse");
 
 	copy?.addEventListener("click", () => runAction(store, "copy"));
+	copyJson?.addEventListener("click", () => runAction(store, "copy-json"));
 	open?.addEventListener("click", () => runAction(store, "tabs"));
 	bookmark?.addEventListener("click", () => runAction(store, "bm"));
 	clear?.addEventListener("click", () => store.clear());
@@ -79,13 +87,14 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	});
 
 	const render = (): void => {
-		if (!rows || !count || !copy || !open || !bookmark || !clear) {
+		if (!rows || !count || !copy || !copyJson || !open || !bookmark || !clear) {
 			return;
 		}
 
 		const entries = store.getEntries();
 		count.textContent = "(" + entries.length + ")";
 		copy.disabled = entries.length === 0;
+		copyJson.disabled = entries.length === 0;
 		open.disabled = entries.length === 0;
 		bookmark.disabled = entries.length === 0;
 		clear.disabled = entries.length === 0;
@@ -121,6 +130,55 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 
 			const row = document.createElement("div");
 			row.className = "row";
+			row.draggable = true;
+			row.setAttribute("aria-roledescription", "Draggable link row");
+
+			row.addEventListener("dragstart", (event: DragEvent) => {
+				if (!event.dataTransfer) {
+					return;
+				}
+				event.dataTransfer.effectAllowed = "move";
+				event.dataTransfer.setData("text/plain", entry.id);
+				row.classList.add("dragging");
+			});
+			row.addEventListener("dragend", () => {
+				row.classList.remove("dragging");
+			});
+			row.addEventListener("dragover", (event: DragEvent) => {
+				event.preventDefault();
+				if (event.dataTransfer) {
+					event.dataTransfer.dropEffect = "move";
+				}
+				row.classList.add("drop-target");
+			});
+			row.addEventListener("dragleave", () => {
+				row.classList.remove("drop-target");
+			});
+			row.addEventListener("drop", (event: DragEvent) => {
+				event.preventDefault();
+				row.classList.remove("drop-target");
+				const movingId = event.dataTransfer?.getData("text/plain");
+				if (!movingId || movingId === entry.id) {
+					return;
+				}
+
+				const ids = store.getEntries().map((item) => item.id);
+				const fromIndex = ids.indexOf(movingId);
+				const targetIndex = ids.indexOf(entry.id);
+				if (fromIndex < 0 || targetIndex < 0) {
+					return;
+				}
+
+				const [ movedId ] = ids.splice(fromIndex, 1);
+				if (!movedId) {
+					return;
+				}
+				const bounds = row.getBoundingClientRect();
+				const insertAfter = event.clientY >= bounds.top + bounds.height / 2;
+				const adjustedTarget = ids.indexOf(entry.id) + (insertAfter ? 1 : 0);
+				ids.splice(adjustedTarget, 0, movedId);
+				store.reorder(ids);
+			});
 			const description = document.createElement("div");
 			description.className = "description";
 			const title = document.createElement("span");
@@ -133,6 +191,31 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 			url.title = entry.url;
 			description.append(title, url);
 
+			const controls = document.createElement("div");
+			controls.className = "controls";
+			const dragHandle = document.createElement("span");
+			dragHandle.className = "drag-handle";
+			dragHandle.textContent = "⋮⋮";
+			dragHandle.title = "Drag this row to reorder";
+		dragHandle.setAttribute("aria-hidden", "true");
+
+			const moveUp = document.createElement("button");
+			moveUp.type = "button";
+			moveUp.textContent = "↑";
+			moveUp.title = "Move link up";
+			moveUp.setAttribute("aria-label", "Move " + (entry.title || entry.url) + " up");
+			moveUp.disabled = store.getEntries()[0]?.id === entry.id;
+			moveUp.addEventListener("click", () => moveEntry(store, entry.id, -1));
+
+			const moveDown = document.createElement("button");
+			moveDown.type = "button";
+			moveDown.textContent = "↓";
+			moveDown.title = "Move link down";
+			moveDown.setAttribute("aria-label", "Move " + (entry.title || entry.url) + " down");
+			const lastEntry = entries[entries.length - 1];
+			moveDown.disabled = lastEntry?.id === entry.id;
+			moveDown.addEventListener("click", () => moveEntry(store, entry.id, 1));
+
 			const remove = document.createElement("button");
 			remove.className = "remove";
 			remove.type = "button";
@@ -141,7 +224,8 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 			remove.setAttribute("aria-label", "Remove " + (entry.title || entry.url));
 			remove.addEventListener("click", () => store.remove(entry.id));
 
-			row.append(description, remove);
+			controls.append(dragHandle, moveUp, moveDown, remove);
+			row.append(description, controls);
 			rows.appendChild(row);
 		}
 	};
@@ -177,7 +261,23 @@ function installHighlightStyle(): void {
 	(document.head || document.documentElement).appendChild(style);
 }
 
-function runAction(store: LinkSelectionStore, action: "copy" | "tabs" | "bm"): void {
+function moveEntry(store: LinkSelectionStore, id: string, offset: -1 | 1): void {
+	const ids = store.getEntries().map((entry) => entry.id);
+	const index = ids.indexOf(id);
+	const nextIndex = index + offset;
+	if (index < 0 || nextIndex < 0 || nextIndex >= ids.length) {
+		return;
+	}
+
+	const [ movedId ] = ids.splice(index, 1);
+	if (!movedId) {
+		return;
+	}
+	ids.splice(nextIndex, 0, movedId);
+	store.reorder(ids);
+}
+
+function runAction(store: LinkSelectionStore, action: "copy" | "copy-json" | "tabs" | "bm"): void {
 	const entries = store.getEntries();
 	if (entries.length === 0) {
 		return;
@@ -189,6 +289,9 @@ function runAction(store: LinkSelectionStore, action: "copy" | "tabs" | "bm"): v
 	switch (action) {
 		case "copy":
 			setting = { action: "copy", options: { block: true, reverse: false, copy: 1 } };
+			break;
+		case "copy-json":
+			setting = { action: "copy", options: { block: true, reverse: false, copy: 7 } };
 			break;
 		case "tabs":
 			setting = { action: "tabs", options: { block: true, reverse: false, end: false, delay: 0, close: 0 } };

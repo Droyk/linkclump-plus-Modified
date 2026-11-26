@@ -94,6 +94,8 @@ export function formatLink({ url, title }: ActivateMessage["urls"][0], copyForma
 			return `<li><a href="${escapeHTML(url)}">${escapeHTML(singleLineTitle)}</a></li>\n`;
 		case CopyFormatType.AS_MARKDOWN:
 			return `[${escapeMarkdownText(singleLineTitle)}](${escapeMarkdownUrl(url)})\n`;
+		case CopyFormatType.AS_JSON:
+			return JSON.stringify({ title: singleLineTitle, url });
 		default:
 			throw new Error(`Invalid copy format: ${copyFormat}`);
 	}
@@ -108,13 +110,21 @@ export function formatLink({ url, title }: ActivateMessage["urls"][0], copyForma
  */
 export async function handleCopyToClipboard(request: ActivateMessage<ActivateMessage_copy>, sender: Browser.runtime.MessageSender): Promise<void> {
 	let text = "";
-	for (let i = 0; i < request.urls.length; i++) {
-		const urlItem = request.urls[i];
-		if (!urlItem) {
-			continue;
-		}
+	if (Number(request.setting.options.copy) === CopyFormatType.AS_JSON) {
+		text = JSON.stringify(
+			request.urls.map(({ url, title }) => ({ title: normalizeTitle(title), url })),
+			null,
+			2
+		);
+	} else {
+		for (let i = 0; i < request.urls.length; i++) {
+			const urlItem = request.urls[i];
+			if (!urlItem) {
+				continue;
+			}
 
-		text += formatLink(urlItem, request.setting.options.copy);
+			text += formatLink(urlItem, request.setting.options.copy);
+		}
 	}
 
 	if (Number(request.setting.options.copy) === CopyFormatType.AS_LIST_LINK_HTML) {
