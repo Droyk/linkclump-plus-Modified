@@ -9,10 +9,18 @@ import {
 	COUNTER_FONT_WEIGHT_DEFAULT
 } from "@/assets/js/constants/ui";
 
-import type { Settings } from "@/assets/js/types/Settings";
+import type { LinkSelectionSettings, Settings } from "@/assets/js/types/Settings";
 
-// Format version
+// The optional collection settings block requires no migration of existing settings.
 export const CURRENT_VERSION = "5" as const;
+
+export const DEFAULT_LINK_SELECTION_SETTINGS: Readonly<LinkSelectionSettings> = Object.freeze({
+	enabled: false,
+	inputMode: "mouse-key",
+	mouseButton: 2,
+	key: 16,
+	holdDurationMs: 450
+});
 
 // key name for Storage
 export const linkclumpSettingsKey = "linkclumpSettings" as const;
@@ -39,5 +47,6 @@ export const DEFAULT_SETTINGS: Settings = Object.freeze({
 			})
 		})
 	}),
-	"blocked": Object.freeze([])
+	"blocked": Object.freeze([]),
+	"selection": DEFAULT_LINK_SELECTION_SETTINGS
 }) as unknown as Settings;

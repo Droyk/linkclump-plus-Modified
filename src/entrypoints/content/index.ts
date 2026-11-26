@@ -4,6 +4,7 @@ import { browser } from "wxt/browser";
 import { detectOs } from "@/assets/js/lib/detectOs";
 import { applySettings, initContentScriptContext } from "./settings/applySettings";
 import { LinkSelectionStore } from "./selection/LinkSelectionStore";
+import { DEFAULT_LINK_SELECTION_SETTINGS } from "@/assets/js/constants/setting";
 
 import type { ContentScriptContext } from "wxt/utils/content-script-context";
 import type {
@@ -95,6 +96,7 @@ function init(): void {
 	window.scroll_id = 0;
 	window.links = [];
 	window.linkSelection = new LinkSelectionStore();
+	window.linkSelectionSettings = { ...DEFAULT_LINK_SELECTION_SETTINGS };
 	// @ts-expect-error -- all will be right at the end of the function
 	window.linkclump = undefined;
 	// @ts-expect-error -- all will be right at the end of the function

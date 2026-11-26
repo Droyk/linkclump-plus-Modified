@@ -197,6 +197,14 @@ describe("LinkSelectionStore", () => {
 		expect(store.getEntries()[0]?.url).toBe("https://example.com/a");
 	});
 
+	it("exposes source elements only while their rows remain in the collection", () => {
+		const anchor = makeAnchor("https://example.com/a", "A");
+		const entry = store.addElement(anchor)!.entry;
+		expect(store.getElement(entry.id)).toBe(anchor);
+		store.remove(entry.id);
+		expect(store.getElement(entry.id)).toBeUndefined();
+	});
+
 	it("removes by id or element and reports missing removals", () => {
 		const anchor = makeAnchor("https://example.com/a", "A");
 		const entry = store.addElement(anchor)!.entry;

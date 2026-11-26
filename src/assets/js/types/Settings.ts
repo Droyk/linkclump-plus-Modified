@@ -7,6 +7,17 @@ export type ActionType = "win" | "tabs" | "bm" | "copy";
 
 export type ActionOptionValue = number | boolean | string | (number | string)[];
 
+export type IndividualSelectionInputMode = "mouse-key" | "mouse-only" | "keyboard-only";
+
+/** Settings for persistent collection and individual link-selection gestures. */
+export interface LinkSelectionSettings {
+	enabled: boolean;
+	inputMode: IndividualSelectionInputMode;
+	mouseButton: 0 | 1 | 2;
+	key: number;
+	holdDurationMs: number;
+}
+
 export interface ActionOptions {
 	smart?: number;
 	ignore?: (number | string)[];
@@ -35,4 +46,6 @@ export interface ActionSetting {
 export type Settings = {
 	actions: Record<string, ActionSetting>;
 	blocked: string[];
+	/** Optional to accept settings files created by older releases. */
+	selection?: LinkSelectionSettings;
 };

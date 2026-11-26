@@ -39,6 +39,7 @@ export type LinkSelectionListener = (entries: readonly Readonly<SelectedLink>[])
 export class LinkSelectionStore {
 	private entries: SelectedLink[] = [];
 	private elementIds = new WeakMap<LinkElement, string>();
+	private elementsById = new Map<string, LinkElement>();
 	private nextId = 1;
 	private nextSelectionOrder = 1;
 	private listeners = new Set<LinkSelectionListener>();
@@ -65,6 +66,11 @@ export class LinkSelectionStore {
 	findByElement(element: LinkElement): Readonly<SelectedLink> | undefined {
 		const id = this.elementIds.get(element);
 		return id === undefined ? undefined : this.findById(id);
+	}
+
+	/** Returns the source element for a live page-backed row. */
+	getElement(id: string): LinkElement | undefined {
+		return this.elementsById.get(id);
 	}
 
 	/** Captures a usable link. Re-selecting the same element is idempotent. */
@@ -154,6 +160,7 @@ export class LinkSelectionStore {
 		}
 		this.entries = [];
 		this.elementIds = new WeakMap<LinkElement, string>();
+		this.elementsById.clear();
 		this.notify();
 		return true;
 	}
@@ -258,6 +265,7 @@ export class LinkSelectionStore {
 
 		this.entries.push(entry);
 		this.elementIds.set(element, entry.id);
+		this.elementsById.set(entry.id, element);
 		return { entry, added: true };
 	}
 
@@ -267,6 +275,7 @@ export class LinkSelectionStore {
 			return false;
 		}
 		this.entries.splice(index, 1);
+		this.elementsById.delete(id);
 		// The WeakMap may retain an old id for this element. IDs are never reused, so a
 		// subsequent add sees that the old record is gone and safely allocates a new id.
 		return true;
@@ -289,5 +298,5 @@ function isUsableUrl(url: string): boolean {
 }
 
 function normalizeText(value: string | null | undefined): string {
-	return (value ?? "").replace(/\\s+/g, " ").trim();
+	return (value ?? "").replace(/\s+/g, " ").trim();
 }

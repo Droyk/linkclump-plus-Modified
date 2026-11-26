@@ -1,6 +1,6 @@
 import type { LinkItem } from "@/assets/js/types/Content";
 import type { OsType } from "@/assets/js/types/OS";
-import type { ActionSetting } from "@/assets/js/types/Settings";
+import type { ActionSetting, LinkSelectionSettings } from "@/assets/js/types/Settings";
 import type { LinkSelectionStore } from "@/entrypoints/content/selection/LinkSelectionStore";
 
 // set all the properties of the window object
@@ -22,6 +22,7 @@ declare global {
 		scroll_id: number;
 		links: LinkItem[];
 		linkSelection: LinkSelectionStore;
+		linkSelectionSettings: LinkSelectionSettings;
 		box: HTMLElement & { x: number, y: number, x1: number, x2: number, y1: number, y2: number };
 		count_label: HTMLElement;
 		linkclump: HTMLElement;

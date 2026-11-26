@@ -590,6 +590,8 @@ export function detect(x: number, y: number, open: boolean): boolean {
 	let count = 0;
 	const count_tabs = new Set;
 	const open_tabs: ActivateMessage["urls"] = [];
+	const collectionLinks: LinkItem[] = [];
+	const collectInsteadOfActing = window.linkSelectionSettings?.enabled === true;
 	for (const link of window.links) {
 		if (
 			(!window.smart_select || link.important)
@@ -601,10 +603,14 @@ export function detect(x: number, y: number, open: boolean): boolean {
 			)
 		) {
 			if (open) {
-				open_tabs.push({
-					"url": link.href,
-					"title": link.innerText
-				});
+				if (collectInsteadOfActing) {
+					collectionLinks.push(link);
+				} else {
+					open_tabs.push({
+						"url": link.href,
+						"title": link.innerText
+					});
+				}
 			}
 
 			// check if important links have been selected and possibly redo
@@ -652,6 +658,10 @@ export function detect(x: number, y: number, open: boolean): boolean {
 	}
 
 	window.count_label.innerText = count_tabs.size.toString();
+
+	if (open && collectInsteadOfActing && collectionLinks.length > 0) {
+		window.linkSelection.addElements(collectionLinks);
+	}
 
 	if (open_tabs.length > 0) {
 		safeAsync(

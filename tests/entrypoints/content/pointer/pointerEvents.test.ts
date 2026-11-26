@@ -24,7 +24,11 @@ import { DRAG_THRESHOLD_MIN_PX } from "@/assets/js/constants/ui";
 import { TestRunner, type TestCase } from "../../../shared/support/TestRunner";
 import { type IntentionalAnyForValidation } from "../../../shared/types";
 
-vi.mock("@/entrypoints/content/selection/lifecycle", () => ({ startSelection: vi.fn() }));
+vi.mock("@/entrypoints/content/selection/lifecycle", () => ({
+	startSelection: vi.fn(),
+	pointermove: vi.fn(),
+	suppressNextClick: vi.fn()
+}));
 
 // =============================================================================
 // 1. Test Data (Separation of Data and Logic)

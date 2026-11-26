@@ -55,6 +55,35 @@
 			<button id="add" class="button">Add Action</button>
 		</div>
 
+		<div id="selection-preferences" class="info-box">
+			<h2>Persistent Link Collection</h2>
+			<p>When enabled, a rectangular selection adds links to a persistent collection instead of immediately running the Action configured above. The floating collection panel lets you remove links and copy, open, or bookmark the current order.</p>
+			<p><label><input id="selection-enabled" type="checkbox" /> Enable persistent link collection</label></p>
+			<p><label for="selection-input-mode">Individual link selection</label>
+				<select id="selection-input-mode">
+					<option value="mouse-key">Hold mouse button + key</option>
+					<option value="mouse-only">Hold mouse button only</option>
+					<option value="keyboard-only">Press key on focused link</option>
+				</select>
+			</p>
+			<p><label id="selection-mouse-label" for="selection-mouse-button">Mouse button</label>
+				<select id="selection-mouse-button">
+					<option value="0">Left</option>
+					<option value="1">Middle</option>
+					<option value="2" selected>Right</option>
+				</select>
+			</p>
+			<p><label id="selection-key-label" for="selection-key">Activation key</label>
+				<select id="selection-key"></select>
+			</p>
+			<p><label id="selection-hold-label" for="selection-hold-ms">Hold duration (milliseconds)</label>
+				<input id="selection-hold-ms" type="number" min="100" max="2000" step="50" value="450" />
+			</p>
+			<p class="small-note">For mouse modes, keep the pointer on a link until the hold completes. Moving beyond the drag threshold cancels the individual-link gesture; the configured rectangle Action can still start if its own mouse/key trigger matches. Keyboard-only mode toggles the currently focused link, not the link under the pointer.</p>
+			<p class="small-note"><b>Right-click caveat:</b> On macOS and Linux, the browser may dispatch the context menu on pointer-down. A configured right-click gesture therefore suppresses the native menu for matching presses, even when the press is released before the hold duration. Windows can usually preserve the native menu on short presses.</p>
+			<div id="selection-error" class="error-message" role="alert"></div>
+		</div>
+
 		<div id="block" class="info-box">
 			<h2>Blocklist</h2>
 
