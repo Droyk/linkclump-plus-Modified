@@ -32,7 +32,6 @@ export interface LinkManagerItem {
 	readonly tabToken?: string;
 	readonly addedAt: number;
 	readonly viewedAt: number | null;
-	readonly tabToken?: string;
 }
 
 export interface LinkManagerState {

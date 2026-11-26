@@ -619,7 +619,8 @@ export class LinkManagerService {
 				const tab = item.tabKind === "placeholder"
 					? await this.createPlaceholder(item, windowId, item.tabToken)
 					: await this.tabs.create({ url: item.url, active: false, windowId });
-				if (tab.id === undefined) {
+				const createdTabId = tab.id;
+				if (createdTabId === undefined) {
 					throw new Error("The browser did not return a tab ID.");
 				}
 				next = {
@@ -627,7 +628,7 @@ export class LinkManagerService {
 					items: next.items.map((candidate) => candidate.id === item.id
 						? {
 							...candidate,
-							tabId: tab.id,
+							tabId: createdTabId,
 							queueStatus: candidate.tabKind === "placeholder" ? "staged" : "opened"
 						}
 						: candidate)
@@ -708,13 +709,14 @@ export class LinkManagerService {
 				const tab = plan.tabKind === "placeholder"
 					? await this.createPlaceholder(item, windowId, item.tabToken)
 					: await this.tabs.create({ url: item.url, active: false, windowId });
-				if (tab.id === undefined) {
+				const createdTabId = tab.id;
+				if (createdTabId === undefined) {
 					throw new Error("The browser did not return a tab ID.");
 				}
 				next = {
 					...next,
 					items: next.items.map((candidate) => candidate.id === itemId
-						? { ...candidate, tabId: tab.id, queueStatus: plan.tabKind === "placeholder" ? "staged" : "opened" }
+						? { ...candidate, tabId: createdTabId, queueStatus: plan.tabKind === "placeholder" ? "staged" : "opened" }
 						: candidate)
 				};
 				await this.writeState(next);

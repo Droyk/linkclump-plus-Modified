@@ -285,4 +285,57 @@ describe("LinkManagerService", () => {
 		]);
 		expect(different).toEqual({});
 	});
+	it("reconnects a placeholder created just before a worker restart using its persisted token", async () => {
+		const env = createEnvironment();
+		let state = await env.service.addLinks({
+			urls: [{ url: "https://example.com/recover", title: "Recover me" }]
+		});
+		const item = state.items[0]!;
+		const originalTabId = item.tabId!;
+		state = {
+			...state,
+			items: state.items.map((candidate) => candidate.id === item.id
+				? { ...candidate, tabId: null, queueStatus: "opening" }
+				: candidate)
+		};
+		env.storageValues[LINK_MANAGER_STORAGE_KEY] = state;
+
+		await env.service.recover();
+		state = await env.state();
+		expect(state.items[0]!.tabId).toBe(originalTabId);
+		expect(state.items[0]!.queueStatus).toBe("staged");
+	});
+
+	it("removes an orphan placeholder by token when recovery finds Link Manager already paused", async () => {
+		const env = createEnvironment();
+		let state = await env.service.addLinks({
+			urls: [{ url: "https://example.com/paused-recovery", title: "Paused" }]
+		});
+		const item = state.items[0]!;
+		const originalTabId = item.tabId!;
+		state = {
+			...state,
+			paused: true,
+			items: state.items.map((candidate) => candidate.id === item.id
+				? { ...candidate, tabId: null, queueStatus: "suspended" }
+				: candidate)
+		};
+		env.storageValues[LINK_MANAGER_STORAGE_KEY] = state;
+
+		await env.service.recover();
+		expect(env.tabs.has(originalTabId)).toBe(false);
+		expect((await env.state()).paused).toBe(true);
+	});
+
+	it("closes a managed browser tab when its link is removed from the manager", async () => {
+		const env = createEnvironment();
+		const state = await env.service.addLinks({
+			urls: [{ url: "https://example.com/remove", title: "Remove me" }]
+		});
+		const tabId = state.items[0]!.tabId!;
+		await env.service.removeItem(state.items[0]!.id);
+		expect(env.tabs.has(tabId)).toBe(false);
+		expect((await env.state()).items).toHaveLength(0);
+	});
+
 });
