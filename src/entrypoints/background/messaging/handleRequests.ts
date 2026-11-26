@@ -42,16 +42,32 @@ export function handleRequests(
 			return false;
 		}
 		case "startSequentialQueue": {
-			safeAsync(
-				"startSequentialQueue",
-				() => sequentialQueueManager.start(request.urls, sender.tab?.id, request.blockDuplicates ?? true),
-				"background"
-			);
-			return false;
+			safeAsync("startSequentialQueue", async () => {
+				try {
+					const started = await sequentialQueueManager.start(
+						request.urls,
+						sender.tab?.id,
+						request.blockDuplicates ?? true
+					);
+					sendResponse({ ok: started });
+				} catch (error) {
+					sendResponse({ ok: false });
+					throw error;
+				}
+			}, "background");
+			return true;
 		}
 		case "stopSequentialQueue": {
-			safeAsync("stopSequentialQueue", () => sequentialQueueManager.stop(), "background");
-			return false;
+			safeAsync("stopSequentialQueue", async () => {
+				try {
+					await sequentialQueueManager.stop();
+					sendResponse({ ok: true });
+				} catch (error) {
+					sendResponse({ ok: false });
+					throw error;
+				}
+			}, "background");
+			return true;
 		}
 		case "createLazyTabs": {
 			safeAsync(
