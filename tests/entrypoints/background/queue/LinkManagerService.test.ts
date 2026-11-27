@@ -179,6 +179,19 @@ function url(path: string): string {
 }
 
 describe("LinkManagerService — direct sequential queue", () => {
+	it("saves selected page links persistently without starting the queue or collapsing same-URL elements", async () => {
+		const env = await createEnvironment();
+		const state = await env.service.saveSelection([
+			{ url: url("same"), title: "First anchor" },
+			{ url: url("same"), title: "Second anchor" }
+		], 1);
+		expect(state.items).toHaveLength(2);
+		expect(state.items.map((item) => item.title)).toEqual([ "First anchor", "Second anchor" ]);
+		expect(state.items.map((item) => item.status)).toEqual([ "queued", "queued" ]);
+		expect(env.created).toHaveLength(0);
+		expect(env.storageValues[LINK_MANAGER_STORAGE_KEY]).toEqual(state);
+	});
+
 	it("creates one direct destination tab and keeps later links pending", async () => {
 		const env = await createEnvironment();
 		const state = await env.service.addLinks({

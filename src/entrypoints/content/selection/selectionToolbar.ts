@@ -54,7 +54,7 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 		"<section class=\"panel\" role=\"region\" aria-label=\"Selected links\">",
 		"<header><strong>Link collection <span id=\"count\">(0)</span></strong><button id=\"collapse\" type=\"button\" aria-expanded=\"true\" title=\"Collapse collection\">−</button></header>",
 		"<div id=\"rows\" aria-live=\"polite\"></div>",
-		"<footer><button id=\"copy\" type=\"button\" class=\"primary\">Copy URLs</button><button id=\"copy-json\" type=\"button\">Copy JSON</button><button id=\"open\" type=\"button\">Open tabs</button><button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"clear\" type=\"button\">Clear</button></footer>",
+		"<footer><button id=\"copy\" type=\"button\" class=\"primary\">Copy URLs</button><button id=\"copy-json\" type=\"button\">Copy JSON</button><button id=\"open\" type=\"button\">Open tabs</button><button id=\"bookmark\" type=\"button\">Bookmark</button><button id=\"save-link-manager\" type=\"button\">Save to Link Manager</button><button id=\"clear\" type=\"button\">Clear</button></footer>",
 		"</section>"
 	].join("");
 
@@ -69,6 +69,7 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	const open = shadow.querySelector<HTMLButtonElement>("#open");
 	const bookmark = shadow.querySelector<HTMLButtonElement>("#bookmark");
 	const clear = shadow.querySelector<HTMLButtonElement>("#clear");
+	const saveLinkManager = shadow.querySelector<HTMLButtonElement>("#save-link-manager");
 	const collapse = shadow.querySelector<HTMLButtonElement>("#collapse");
 
 	copy?.addEventListener("click", () => runAction(store, "copy"));
@@ -76,6 +77,9 @@ export function createSelectionToolbar(store: LinkSelectionStore): void {
 	open?.addEventListener("click", () => runAction(store, "tabs"));
 	bookmark?.addEventListener("click", () => runAction(store, "bm"));
 	clear?.addEventListener("click", () => store.clear());
+	saveLinkManager?.addEventListener("click", () => {
+		void saveSelectionToLinkManager(store, saveLinkManager);
+	});
 	collapse?.addEventListener("click", () => {
 		if (!panel || !collapse) {
 			return;
@@ -275,6 +279,30 @@ function moveEntry(store: LinkSelectionStore, id: string, offset: -1 | 1): void 
 	}
 	ids.splice(nextIndex, 0, movedId);
 	store.reorder(ids);
+}
+
+async function saveSelectionToLinkManager(store: LinkSelectionStore, button: HTMLButtonElement): Promise<void> {
+	const entries = store.getEntries();
+	if (entries.length === 0) {
+		return;
+	}
+	button.disabled = true;
+	button.textContent = "Saving…";
+	try {
+		const response = await browser.runtime.sendMessage({
+			message: "linkManagerSaveSelection",
+			urls: entries.map(({ url, title }) => ({ url, title }))
+		}) as { ok?: boolean; error?: string } | undefined;
+		if (!response?.ok) {
+			throw new Error(response?.error || "Unable to save this selection to Link Manager.");
+		}
+		button.textContent = "Saved to Link Manager";
+	} catch (error) {
+		button.textContent = "Save failed";
+		console.error("[Linkclump] Could not save selection to Link Manager:", error);
+	} finally {
+		button.disabled = false;
+	}
 }
 
 function runAction(store: LinkSelectionStore, action: "copy" | "copy-json" | "tabs" | "bm"): void {

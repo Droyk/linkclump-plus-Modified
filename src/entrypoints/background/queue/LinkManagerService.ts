@@ -227,6 +227,51 @@ export class LinkManagerService {
 		});
 	}
 
+
+	saveSelection(
+		urls: readonly { readonly url: string; readonly title: string }[],
+		queueWindowId: number | undefined
+	): Promise<LinkManagerState> {
+		return this.serialize(async () => {
+			if (queueWindowId === undefined || !Number.isInteger(queueWindowId) || queueWindowId < 0) {
+				throw new Error("The source browser window could not be identified.");
+			}
+			const state = await this.readState();
+			const listId = state.activeListId;
+			let order = state.items.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+			const addedAt = this.now();
+			const added: LinkManagerItem[] = [];
+			for (const entry of urls) {
+				const normalized = normalizeManagerUrl(entry.url);
+				if (!normalized || typeof entry.title !== "string") {
+					continue;
+				}
+				added.push({
+					id: this.idFactory(),
+					listId,
+					url: normalized,
+					title: entry.title.trim().slice(0, 300) || normalized,
+					order: order++,
+					queueWindowId,
+					status: "queued",
+					tabId: null,
+					tabWindowId: null,
+					ownership: null,
+					readStatus: "unread",
+					addedAt,
+					openedAt: null,
+					resumeOnResume: false
+				});
+			}
+			if (added.length === 0) {
+				throw new Error("The selection contains no valid navigable URLs.");
+			}
+			const next = { ...state, items: [ ...state.items, ...added ] };
+			await this.writeState(next);
+			return structuredClone(next);
+		});
+	}
+
 	addList(name: string): Promise<LinkManagerState> {
 		return this.serialize(async () => {
 			const state = await this.readState();

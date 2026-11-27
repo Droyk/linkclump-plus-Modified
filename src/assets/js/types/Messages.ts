@@ -43,6 +43,7 @@ export type LinkManagerMessage =
 	| { "message": "linkManagerGetState" }
 	| { "message": "linkManagerInspectDuplicates"; "urls": readonly { url: string; title: string }[]; "queueWindowId": number }
 	| { "message": "linkManagerAddLinks"; "request": LinkManagerAddLinksRequest }
+	| { "message": "linkManagerSaveSelection"; "urls": readonly { readonly url: string; readonly title: string }[] }
 	| { "message": "linkManagerAddList"; "name": string }
 	| { "message": "linkManagerSetActiveList"; "listId": string }
 	| { "message": "linkManagerSetViewMode"; "viewMode": LinkManagerViewMode }

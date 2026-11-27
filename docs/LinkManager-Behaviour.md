@@ -44,4 +44,6 @@ Each item has only **Unread** or **Read**. Activating a queue tab marks it Read.
 
 Pause stops queue progression and closes Managed tabs. Borrowed tabs remain open. Resume recreates tabs that were closed by Pause and retains their URLs and queue order. Removing a Managed item closes its associated tab; removing a Borrowed item leaves its tab open.
 
+The page selection toolbar has a **Save to Link Manager** action. It copies the current selection into the active persistent collection without opening tabs. Two distinct page elements with the same URL remain separate collection entries. The selection itself is still frame-local and temporary until saved; the saved collection survives page reloads.
+
 Collections are a view and grouping layer over the queue items. The extension retains combined and per-collection views, link entry by one URL per line or Title followed by a Tab and URL, manual collection selection, and multi-select actions. The Link Manager state is persisted locally. Session duplicate and ownership preferences use extension session storage when the browser provides it.

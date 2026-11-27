@@ -44,6 +44,13 @@ export function handleRequests(
 			);
 		case "linkManagerAddLinks":
 			return respond("linkManagerAddLinks", () => linkManagerService.addLinks(request.request), sendResponse, (state) => ({ ok: true, state }));
+		case "linkManagerSaveSelection":
+			return respond(
+				"linkManagerSaveSelection",
+				() => linkManagerService.saveSelection(request.urls, sender.tab?.windowId),
+				sendResponse,
+				(state) => ({ ok: true, state })
+			);
 		case "linkManagerAddList":
 			return respond("linkManagerAddList", () => linkManagerService.addList(request.name), sendResponse, (state) => ({ ok: true, state }));
 		case "linkManagerSetActiveList":
