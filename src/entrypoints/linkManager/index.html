@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="color-scheme" content="light dark" />
+	<title>Link Manager</title>
+	<script type="module" src="./index.ts"></script>
+	<style>
+		:root { font:13px/1.45 system-ui,sans-serif; color-scheme:light dark; background:Canvas; color:CanvasText; }
+		* { box-sizing:border-box; }
+		body { margin:0; min-width:290px; }
+		header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px; border-bottom:1px solid color-mix(in srgb,CanvasText 18%,transparent); }
+		h1 { margin:0; font-size:16px; }
+		main { padding:10px; display:grid; gap:10px; }
+		.toolbar { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+		.toolbar .wide { grid-column:1/-1; }
+		#add-form { display:grid; gap:6px; padding:9px; border:1px solid color-mix(in srgb,CanvasText 18%,transparent); border-radius:8px; }
+		#add-form label { font-weight:600; }
+		textarea { width:100%; min-height:78px; resize:vertical; font:12px/1.45 ui-monospace,monospace; }
+		input,select,textarea,button { font:inherit; color:inherit; }
+		input,select,textarea { min-width:0; padding:6px 7px; border:1px solid color-mix(in srgb,CanvasText 28%,transparent); border-radius:5px; background:Canvas; }
+		button { padding:6px 8px; border:1px solid color-mix(in srgb,CanvasText 25%,transparent); border-radius:6px; background:ButtonFace; cursor:pointer; }
+		button.primary { font-weight:600; background:Highlight; color:HighlightText; border-color:Highlight; }
+		button:disabled { opacity:.45; cursor:default; }
+		#list-select { width:100%; }
+		#status { min-height:1.4em; color:GrayText; overflow-wrap:anywhere; }
+		#summary { display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 8px; color:GrayText; }
+		#items { display:grid; gap:6px; }
+		.collection-heading { margin:8px 2px 0; padding-bottom:4px; border-bottom:1px solid color-mix(in srgb,CanvasText 18%,transparent); font-weight:700; }
+		.item { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:start; padding:8px; border:1px solid color-mix(in srgb,CanvasText 15%,transparent); border-radius:7px; cursor:pointer; }
+		.item[aria-selected="true"] { outline:2px solid Highlight; background:color-mix(in srgb,Highlight 9%,Canvas); }
+		.item-title { display:block; font-weight:600; overflow-wrap:anywhere; }
+		.item-title.read { text-decoration:line-through; opacity:.72; }
+		.item-url { display:block; margin-top:2px; color:GrayText; font-size:11px; overflow-wrap:anywhere; }
+		.item-meta { display:block; margin-top:5px; color:GrayText; font-size:11px; overflow-wrap:anywhere; }
+		.item-actions { display:grid; gap:4px; }
+		.item-actions button { padding:4px 6px; font-size:11px; white-space:nowrap; }
+		#selection-actions { display:flex; flex-wrap:wrap; gap:5px; }
+		.empty { padding:18px 8px; text-align:center; color:GrayText; border:1px dashed color-mix(in srgb,CanvasText 25%,transparent); border-radius:7px; }
+		dialog { width:min(560px,calc(100vw - 24px)); max-height:84vh; border:1px solid color-mix(in srgb,CanvasText 25%,transparent); border-radius:10px; background:Canvas; color:CanvasText; }
+		dialog::backdrop { background:rgba(0,0,0,.45); }
+		dialog form { display:grid; gap:9px; }
+		dialog h2 { margin:0; font-size:15px; }
+		dialog p { margin:0; overflow-wrap:anywhere; }
+		#duplicate-tabs { display:grid; gap:5px; max-height:38vh; overflow:auto; }
+		.duplicate-row { display:grid; grid-template-columns:1fr auto; gap:8px; padding:7px; border:1px solid color-mix(in srgb,CanvasText 16%,transparent); border-radius:6px; }
+		.duplicate-title { display:block; font-weight:600; overflow-wrap:anywhere; }
+		.duplicate-meta { display:block; color:GrayText; font-size:11px; overflow-wrap:anywhere; }
+		.duplicate-controls { display:grid; grid-template-columns:auto auto; gap:8px; align-items:center; }
+		.duplicate-controls label { display:flex; align-items:center; gap:3px; white-space:nowrap; font-size:11px; }
+		.prompt-settings { display:grid; gap:7px; padding:8px; border:1px solid color-mix(in srgb,CanvasText 18%,transparent); border-radius:7px; }
+		.dialog-actions { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+		@media (max-width:370px) { .toolbar { grid-template-columns:1fr; } .toolbar .wide { grid-column:auto; } .duplicate-row { grid-template-columns:1fr; } }
+	</style>
+</head>
+<body>
+	<header>
+		<h1>Link Manager</h1>
+		<button id="pause" type="button">Pause</button>
+	</header>
+	<main>
+		<div class="toolbar">
+			<label>Sidebar view
+				<select id="view-mode"><option value="combined">Combined</option><option value="collections">Collections</option></select>
+			</label>
+			<label>Save links to <select id="list-select"></select></label>
+			<label>Reused-tab ownership
+				<select id="default-ownership">
+					<option value="borrowed">B — Borrowed (leave open)</option>
+					<option value="managed">A — Managed (Link Manager controls it)</option>
+				</select>
+			</label>
+			<label>Matching tabs in other windows
+				<select id="window-policy">
+					<option value="current-window">Current window only</option>
+					<option value="follow">Follow across windows</option>
+				</select>
+			</label>
+			<label class="wide"><input id="single-click-open" type="checkbox" /> Single-click opens links (otherwise click selects; double-click opens)</label>
+			<button id="open-selected" type="button" class="primary wide" disabled>Open selected (first active, rest in background)</button>
+			<button id="add-list" type="button">New collection</button>
+			<button id="settings" type="button">Extension settings</button>
+		</div>
+
+		<form id="add-form">
+			<label for="links-input">Add links to this window's queue</label>
+			<textarea id="links-input" placeholder="Paste one URL per line&#10;Optional: Title, then press Tab, then URL"></textarea>
+			<button id="add-links" type="submit" class="primary">Add links</button>
+		</form>
+
+		<div id="selection-actions">
+			<button id="mark-read" type="button" disabled>Mark selected read</button>
+			<button id="mark-unread" type="button" disabled>Mark selected unread</button>
+			<button id="remove-selected" type="button" disabled>Remove selected</button>
+			<button id="clear-selection" type="button" disabled>Clear selection</button>
+		</div>
+		<div id="summary"><span id="counts">Loading…</span><span id="queue-status"></span></div>
+		<div id="items" role="listbox" aria-label="Saved links" aria-multiselectable="true"></div>
+		<div id="status" role="status" aria-live="polite"></div>
+	</main>
+
+	<dialog id="duplicate-dialog">
+		<form method="dialog">
+			<h2>Matching tabs already exist</h2>
+			<p id="duplicate-description"></p>
+			<p>Choose exactly one tab to activate. Check any other tabs you want to close. Tabs not selected for either action remain untouched.</p>
+			<div id="duplicate-tabs"></div>
+			<div class="prompt-settings">
+				<label>Ownership of the reused tab
+					<select id="duplicate-ownership">
+						<option value="borrowed">B — Borrowed: track and activate, but never close</option>
+						<option value="managed">A — Managed: Link Manager may close on Pause/removal</option>
+					</select>
+				</label>
+				<label><input id="remember-resolution" type="checkbox" /> Save the duplicate-resolution policy for this session</label>
+				<label><input id="remember-ownership" type="checkbox" /> Save this ownership choice for this session</label>
+				<p>Remembering a policy applies it to future matches; it does not remember particular tab IDs.</p>
+			</div>
+			<div class="dialog-actions">
+				<button id="apply-custom" type="button" class="primary">Close checked tabs and activate selected tab</button>
+				<button id="replace-all" type="button">Close all matches and open a new tab</button>
+				<button id="open-duplicate" type="button">Leave all matches open and open a duplicate</button>
+				<button id="cancel-duplicate" type="button">Skip this link</button>
+			</div>
+		</form>
+	</dialog>
+</body>
+</html>
