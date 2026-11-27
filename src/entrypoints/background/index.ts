@@ -51,7 +51,10 @@ function main(): void {
 	browser.commands.onCommand.addListener((command) => {
 		safeAsync("linkManagerCommand:" + command, async () => {
 			if (command === "toggle-link-manager-pause") {
-				await linkManagerService.togglePause();
+				const activeTab = (await browser.tabs.query({ active: true, currentWindow: true }))[0];
+				if (activeTab?.windowId !== undefined) {
+					await linkManagerService.togglePause(activeTab.windowId);
+				}
 			} else if (command === "open-link-manager") {
 				await openLinkManager();
 			}

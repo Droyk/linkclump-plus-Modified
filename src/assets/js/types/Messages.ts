@@ -57,7 +57,7 @@ export type LinkManagerMessage =
 	| { "message": "linkManagerClearCollection"; "queueWindowId": number; "listId": string }
 	| { "message": "linkManagerOpenItem"; "itemId": string }
 	| { "message": "linkManagerOpenSelected"; "itemIds": readonly string[]; "queueWindowId": number; "duplicateActions"?: readonly LinkManagerDuplicateAction[] }
-	| { "message": "linkManagerTogglePause" };
+	| { "message": "linkManagerTogglePause"; "queueWindowId": number };
 
 export type Messages = ActivateMessage | InitMessage | UpdateMessage | LinkManagerMessage;
 export type InitResponse = Settings & { error?: string };

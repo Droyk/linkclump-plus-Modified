@@ -93,7 +93,7 @@ export function handleRequests(
 				(state) => ({ ok: true, state })
 			);
 		case "linkManagerTogglePause":
-			return respond("linkManagerTogglePause", () => linkManagerService.togglePause(), sendResponse, (state) => ({ ok: true, state }));
+			return respond("linkManagerTogglePause", () => linkManagerService.togglePause(request.queueWindowId), sendResponse, (state) => ({ ok: true, state }));
 		default:
 			return false;
 	}

@@ -29,8 +29,8 @@ export interface LinkManagerItem {
 }
 
 export interface LinkManagerState {
-	readonly version: 2;
-	readonly paused: boolean;
+	readonly version: 3;
+	readonly pausedWindowIds: readonly number[];
 	readonly viewMode: LinkManagerViewMode;
 	readonly openOnSingleClick: boolean;
 	readonly defaultOwnership: LinkManagerOwnership;

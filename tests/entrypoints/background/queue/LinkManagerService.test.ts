@@ -500,6 +500,41 @@ describe("LinkManagerService — direct sequential queue", () => {
 		expect(env.focusedWindows).toContain(2);
 	});
 
+
+	it("pauses and resumes each browser window independently", async () => {
+		const env = await createEnvironment([
+			{ id: 1, index: 0, windowId: 1, url: "https://source-one.example/", title: "Source one", active: true },
+			{ id: 2, index: 0, windowId: 2, url: "https://source-two.example/", title: "Source two", active: true }
+		]);
+		let state = await env.service.addLinks({
+			queueWindowId: 1,
+			urls: [{ url: url("one"), title: "Window one" }]
+		});
+		const firstTabId = state.items[0]!.tabId!;
+		state = await env.service.addLinks({
+			queueWindowId: 2,
+			urls: [{ url: url("two"), title: "Window two" }]
+		});
+		const secondTabId = state.items.find((item) => item.queueWindowId === 2)!.tabId!;
+
+		state = await env.service.togglePause(1);
+		expect(state.pausedWindowIds).toContain(1);
+		expect(state.pausedWindowIds).not.toContain(2);
+		expect(env.tabs.has(firstTabId)).toBe(false);
+		expect(env.tabs.has(secondTabId)).toBe(true);
+
+		state = await env.service.addLinks({
+			queueWindowId: 2,
+			urls: [{ url: url("two-more"), title: "Window two remains active" }]
+		});
+		expect(state.items.find((item) => item.url === url("two-more"))?.status).toBe("queued");
+
+		state = await env.service.togglePause(1);
+		expect(state.pausedWindowIds).not.toContain(1);
+		expect(state.items.find((item) => item.url === url("one"))?.status).toBe("open");
+		expect(env.created.filter((tab) => tab.url === url("one"))).toHaveLength(2);
+	});
+
 	it("does not open replacement tabs when an entire queue window closes", async () => {
 		const env = await createEnvironment();
 		const state = await env.service.addLinks({

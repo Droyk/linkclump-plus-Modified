@@ -39,6 +39,10 @@ let visibleIds: string[] = [];
 let selectedIds = new Set<string>();
 let anchorId: string | null = null;
 
+function isCurrentWindowPaused(): boolean {
+	return state?.pausedWindowIds.includes(currentWindowId) ?? false;
+}
+
 async function send(message: LinkManagerMessage): Promise<ManagerResponse> {
 	const response = await browser.runtime.sendMessage(message) as ManagerResponse | undefined;
 	if (!response?.ok) {
@@ -317,7 +321,7 @@ function render(): void {
 	($("#default-ownership") as HTMLSelectElement).value = state.defaultOwnership;
 	($("#window-policy") as HTMLSelectElement).value = state.windowPolicy;
 	($("#single-click-open") as HTMLInputElement).checked = state.openOnSingleClick;
-	($("#pause") as HTMLButtonElement).textContent = state.paused ? "Resume" : "Pause";
+	($("#pause") as HTMLButtonElement).textContent = isCurrentWindowPaused() ? "Resume" : "Pause";
 	($("#open-selected") as HTMLButtonElement).disabled = selectedIds.size === 0;
 
 	const listSelect = $("#list-select") as HTMLSelectElement;
@@ -344,8 +348,8 @@ function render(): void {
 	if (items.length === 0) {
 		const empty = document.createElement("div");
 		empty.className = "empty";
-		empty.textContent = state.paused
-			? "Link Manager is paused. New links will wait until resumed."
+		empty.textContent = isCurrentWindowPaused()
+			? "This window's queue is paused. New links will wait until resumed."
 			: "No links in this window's queue yet. Paste URLs above to begin.";
 		root.appendChild(empty);
 	} else if (grouped) {
@@ -373,7 +377,7 @@ function render(): void {
 	const readCount = items.filter((item) => item.readStatus === "read").length;
 	$("#counts").textContent = items.length + " links · " + openCount + " open queue tabs · "
 		+ unreadCount + " unread · " + readCount + " read";
-	$("#queue-status").textContent = state.paused ? "Paused" : "Running";
+	$("#queue-status").textContent = isCurrentWindowPaused() ? "Paused" : "Running";
 	const activeListItems = items.filter((item) => item.listId === state!.activeListId);
 	($("#remove-duplicates") as HTMLButtonElement).disabled = activeListItems.length < 2;
 	($("#clear-collection") as HTMLButtonElement).disabled = activeListItems.length === 0;
@@ -588,7 +592,7 @@ $("#add-form").addEventListener("submit", (event) => {
 	void addLinks(event as SubmitEvent);
 });
 $("#pause").addEventListener("click", () => {
-	void runAction(() => send({ message: "linkManagerTogglePause" }));
+	void runAction(() => send({ message: "linkManagerTogglePause", queueWindowId: currentWindowId }));
 });
 $("#open-selected").addEventListener("click", () => void openSelected());
 $("#view-mode").addEventListener("change", () => {

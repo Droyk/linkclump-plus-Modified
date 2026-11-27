@@ -67,8 +67,8 @@ function isState(value: unknown): value is LinkManagerState {
 		return false;
 	}
 	const candidate = value as Record<string, unknown>;
-	return candidate.version === 2
-		&& typeof candidate.paused === "boolean"
+	return candidate.version === 3
+		&& Array.isArray(candidate.pausedWindowIds)
 		&& (candidate.viewMode === "combined" || candidate.viewMode === "collections")
 		&& typeof candidate.openOnSingleClick === "boolean"
 		&& isOwnership(candidate.defaultOwnership)
@@ -94,8 +94,8 @@ export function normalizeManagerUrl(value: string): string | null {
 function createDefaultState(now: number): LinkManagerState {
 	const inbox: LinkManagerList = { id: "inbox", name: "Inbox", createdAt: now };
 	return {
-		version: 2,
-		paused: false,
+		version: 3,
+		pausedWindowIds: [],
 		viewMode: "combined",
 		openOnSingleClick: false,
 		defaultOwnership: "borrowed",
@@ -108,6 +108,44 @@ function createDefaultState(now: number): LinkManagerState {
 
 function sortByOrder(items: readonly LinkManagerItem[]): LinkManagerItem[] {
 	return [ ...items ].sort((a, b) => a.order - b.order || a.addedAt - b.addedAt);
+}
+
+function isWindowPaused(state: LinkManagerState, windowId: number): boolean {
+	return state.pausedWindowIds.includes(windowId);
+}
+
+function migrateVersionTwoState(value: unknown): LinkManagerState | null {
+	if (typeof value !== "object" || value === null) {
+		return null;
+	}
+	const candidate = value as Record<string, unknown>;
+	if (candidate.version !== 2
+		|| typeof candidate.paused !== "boolean"
+		|| !Array.isArray(candidate.lists)
+		|| !Array.isArray(candidate.items)
+		|| typeof candidate.activeListId !== "string"
+		|| (candidate.viewMode !== "combined" && candidate.viewMode !== "collections")
+		|| typeof candidate.openOnSingleClick !== "boolean"
+		|| !isOwnership(candidate.defaultOwnership)
+		|| (candidate.windowPolicy !== "current-window" && candidate.windowPolicy !== "follow")) {
+		return null;
+	}
+	const lists = candidate.lists as LinkManagerList[];
+	const items = candidate.items as LinkManagerItem[];
+	const pausedWindowIds = candidate.paused
+		? [ ...new Set(items.map((item) => item.queueWindowId).filter(Number.isInteger)) ]
+		: [];
+	return {
+		version: 3,
+		pausedWindowIds,
+		viewMode: candidate.viewMode,
+		openOnSingleClick: candidate.openOnSingleClick,
+		defaultOwnership: candidate.defaultOwnership,
+		windowPolicy: candidate.windowPolicy,
+		activeListId: candidate.activeListId,
+		lists,
+		items
+	};
 }
 
 /**
@@ -517,7 +555,7 @@ export class LinkManagerService {
 			}
 			state = { ...state, items: [ ...state.items, ...added ] };
 			await this.writeState(state);
-			if (!state.paused) {
+			if (!isWindowPaused(state, queueWindowId)) {
 				const hasOpenQueueItem = state.items.some((item) =>
 					item.queueWindowId === queueWindowId
 					&& item.status === "open"
@@ -544,8 +582,8 @@ export class LinkManagerService {
 	): Promise<LinkManagerState> {
 		return this.serialize(async () => {
 			let state = await this.readState();
-			if (state.paused) {
-				throw new Error("Resume Link Manager before opening links.");
+			if (isWindowPaused(state, queueWindowId)) {
+				throw new Error("Resume this window's Link Manager queue before opening links.");
 			}
 			const uniqueIds = [ ...new Set(itemIds) ];
 			const items = uniqueIds.map((id) => state.items.find((item) => item.id === id))
@@ -712,78 +750,90 @@ export class LinkManagerService {
 		});
 	}
 
-	togglePause(): Promise<LinkManagerState> {
+	togglePause(queueWindowId: number): Promise<LinkManagerState> {
 		return this.serialize(async () => {
+			if (!Number.isInteger(queueWindowId) || queueWindowId < 0) {
+				throw new Error("A valid browser window is required to pause its queue.");
+			}
 			let state = await this.readState();
-			if (!state.paused) {
-				const managedItems = state.items.filter((item) => item.ownership === "managed" && item.tabId !== null);
+			const currentlyPaused = isWindowPaused(state, queueWindowId);
+			if (!currentlyPaused) {
+				const managedItems = state.items.filter((item) =>
+					item.queueWindowId === queueWindowId && item.ownership === "managed" && item.tabId !== null
+				);
 				state = {
 					...state,
-					paused: true,
-					items: state.items.map((item) => item.ownership === "managed" && item.tabId !== null
-						? { ...item, status: "queued", tabId: null, tabWindowId: null, resumeOnResume: true }
-						: item)
+					pausedWindowIds: [ ...state.pausedWindowIds, queueWindowId ],
+					items: state.items.map((item) =>
+						item.queueWindowId === queueWindowId && item.ownership === "managed" && item.tabId !== null
+							? { ...item, status: "queued", tabId: null, tabWindowId: null, resumeOnResume: true }
+							: item)
 				};
 				await this.writeState(state);
-				const ids = managedItems.map((item) => item.tabId!).filter(Number.isInteger);
 				for (const item of managedItems) {
 					if (item.tabId !== null && item.tabWindowId !== null
 						&& this.activeTabByWindow.get(item.tabWindowId) === item.tabId) {
 						this.activeTabByWindow.delete(item.tabWindowId);
 					}
 				}
+				const ids = managedItems.map((item) => item.tabId!).filter(Number.isInteger);
 				if (ids.length > 0) {
 					await this.tabs.remove(ids).catch(reportManagerError);
 				}
 				return structuredClone(await this.readState());
 			}
 
-			state = { ...state, paused: false };
+			state = {
+				...state,
+				pausedWindowIds: state.pausedWindowIds.filter((id) => id !== queueWindowId)
+			};
 			await this.writeState(state);
-			const sessions = new Map<number, LinkManagerItem[]>();
-			for (const item of sortByOrder(state.items.filter((candidate) => candidate.resumeOnResume))) {
-				const group = sessions.get(item.queueWindowId) ?? [];
-				group.push(item);
-				sessions.set(item.queueWindowId, group);
-			}
-			for (const [ windowId, restoreItems ] of sessions) {
-				let first = true;
-				for (const restore of restoreItems) {
-					const current = state.items.find((item) => item.id === restore.id);
-					if (!current) {
-						continue;
+			const restoreItems = sortByOrder(state.items.filter((item) =>
+				item.queueWindowId === queueWindowId && item.resumeOnResume
+			));
+			let first = true;
+			for (const restore of restoreItems) {
+				const current = state.items.find((item) => item.id === restore.id);
+				if (!current) {
+					continue;
+				}
+				try {
+					const tab = await this.tabs.create({ url: current.url, active: first, windowId: queueWindowId });
+					if (tab.id === undefined) {
+						throw new Error("The browser did not return a tab ID.");
 					}
-					try {
-						const tab = await this.tabs.create({ url: current.url, active: first, windowId });
-						if (tab.id === undefined) {
-							throw new Error("The browser did not return a tab ID.");
-						}
-						const updated: LinkManagerItem = {
-							...current,
-							status: "open",
-							tabId: tab.id,
-							tabWindowId: tab.windowId,
-							ownership: "managed",
-							openedAt: current.openedAt ?? this.now(),
-							resumeOnResume: false
-						};
-						state = { ...state, items: state.items.map((item) => item.id === updated.id ? updated : item) };
-						await this.writeState(state);
-						if (first) {
-							this.activeTabByWindow.set(windowId, tab.id);
-						}
-						first = false;
-					} catch (error) {
-						reportManagerError(error);
+					const updated: LinkManagerItem = {
+						...current,
+						status: "open",
+						tabId: tab.id,
+						tabWindowId: tab.windowId,
+						ownership: "managed",
+						openedAt: current.openedAt ?? this.now(),
+						resumeOnResume: false
+					};
+					state = {
+						...state,
+						items: state.items.map((item) => item.id === updated.id ? updated : item)
+					};
+					await this.writeState(state);
+					if (first) {
+						this.activeTabByWindow.set(queueWindowId, tab.id);
 					}
+					first = false;
+				} catch (error) {
+					reportManagerError(error);
 				}
 			}
-			const liveWindows = new Set((await this.tabs.query()).map((tab) => tab.windowId));
-			for (const windowId of new Set(state.items.map((item) => item.queueWindowId))) {
-				if (liveWindows.has(windowId) && !state.items.some((item) => item.queueWindowId === windowId && item.status === "open")) {
-					await this.openNextQueued(windowId);
-					state = await this.readState();
-				}
+			const liveTabs = await this.tabs.query();
+			const hasOpenQueueItem = state.items.some((item) =>
+				item.queueWindowId === queueWindowId
+				&& item.status === "open"
+				&& item.tabId !== null
+				&& liveTabs.some((tab) => tab.id === item.tabId)
+			);
+			if (!hasOpenQueueItem) {
+				await this.openNextQueued(queueWindowId);
+				state = await this.readState();
 			}
 			return structuredClone(state);
 		});
@@ -875,7 +925,7 @@ export class LinkManagerService {
 			if (managedTabIds.length > 0) {
 				await this.tabs.remove(managedTabIds).catch(reportManagerError);
 			}
-			if (closesActiveQueueTab && !next.paused) {
+			if (closesActiveQueueTab && !isWindowPaused(next, queueWindowId)) {
 				await this.advanceQueue(queueWindowId);
 			}
 			return structuredClone(await this.readState());
@@ -909,7 +959,7 @@ export class LinkManagerService {
 			if (item.ownership === "managed" && item.tabId !== null) {
 				await this.tabs.remove(item.tabId).catch(reportManagerError);
 			}
-			if (wasActive && item.ownership === "managed" && !next.paused) {
+			if (wasActive && item.ownership === "managed" && !isWindowPaused(next, item.queueWindowId)) {
 				await this.advanceQueue(item.queueWindowId);
 			}
 			return structuredClone(await this.readState());
@@ -951,7 +1001,7 @@ export class LinkManagerService {
 
 	private async advanceQueue(queueWindowId: number): Promise<void> {
 		const state = await this.readState();
-		if (state.paused) {
+		if (isWindowPaused(state, queueWindowId)) {
 			return;
 		}
 		const liveTabs = await this.tabs.query();
@@ -1081,7 +1131,7 @@ export class LinkManagerService {
 				: candidate)
 		};
 		await this.writeState(next);
-		if (wasActive && !next.paused && !removeInfo.isWindowClosing) {
+		if (wasActive && !isWindowPaused(next, item.queueWindowId) && !removeInfo.isWindowClosing) {
 			await this.advanceQueue(item.queueWindowId);
 		}
 	}
@@ -1183,6 +1233,11 @@ export class LinkManagerService {
 		const value = stored[LINK_MANAGER_STORAGE_KEY];
 		if (isState(value)) {
 			return value;
+		}
+		const migrated = migrateVersionTwoState(value);
+		if (migrated) {
+			await this.writeState(migrated);
+			return migrated;
 		}
 		const state = createDefaultState(this.now());
 		await this.writeState(state);
