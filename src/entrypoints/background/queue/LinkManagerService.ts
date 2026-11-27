@@ -697,7 +697,7 @@ export class LinkManagerService {
 				group.push(item);
 				sessions.set(item.queueWindowId, group);
 			}
-			for (const [windowId, restoreItems] of sessions) {
+			for (const [ windowId, restoreItems ] of sessions) {
 				let first = true;
 				for (const restore of restoreItems) {
 					const current = state.items.find((item) => item.id === restore.id);
@@ -969,12 +969,8 @@ export class LinkManagerService {
 			return;
 		}
 		if (state.windowPolicy === "current-window" && newWindowId !== item.queueWindowId) {
-			let movedTabIsActive = false;
-			try {
-				movedTabIsActive = (await this.tabs.get(tabId)).active === true;
-			} catch {
-				movedTabIsActive = false;
-			}
+			const movedTabIsActive = await this.tabs.get(tabId)
+				.then((tab) => tab.active === true, () => false);
 			const wasActive = movedTabIsActive
 				|| this.activeTabByWindow.get(item.tabWindowId ?? item.queueWindowId) === tabId;
 			if (item.tabWindowId !== null && this.activeTabByWindow.get(item.tabWindowId) === tabId) {
