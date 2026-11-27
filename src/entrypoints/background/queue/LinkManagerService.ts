@@ -1023,7 +1023,7 @@ export class LinkManagerService {
 
 	private async openNextQueued(queueWindowId: number): Promise<void> {
 		const state = await this.readState();
-		if (state.paused) {
+		if (isWindowPaused(state, queueWindowId)) {
 			return;
 		}
 		const next = sortByOrder(state.items.filter((item) => item.queueWindowId === queueWindowId && item.status === "queued"))[0];

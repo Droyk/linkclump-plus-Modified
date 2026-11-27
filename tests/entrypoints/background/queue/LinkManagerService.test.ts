@@ -376,12 +376,12 @@ describe("LinkManagerService — direct sequential queue", () => {
 		state = await env.service.openSelected(state.items.map((item) => item.id), 1);
 		const managedId = state.items[0]!.tabId!;
 		expect(state.items[1]!.ownership).toBe("borrowed");
-		state = await env.service.togglePause();
-		expect(state.paused).toBe(true);
+		state = await env.service.togglePause(1);
+		expect(state.pausedWindowIds).toContain(1);
 		expect(env.tabs.has(managedId)).toBe(false);
 		expect(env.tabs.has(20)).toBe(true);
-		state = await env.service.togglePause();
-		expect(state.paused).toBe(false);
+		state = await env.service.togglePause(1);
+		expect(state.pausedWindowIds).not.toContain(1);
 		expect(state.items[0]!.tabId).not.toBeNull();
 		expect(env.tabs.has(20)).toBe(true);
 		expect(env.created.some((entry) => entry.url === url("managed"))).toBe(true);
