@@ -386,6 +386,13 @@ export class LinkManagerService {
 					}
 				}
 
+				const selectedTrackedItem = activateTab
+					? state.items.find((item) => item.tabId === activateTab!.id)
+					: undefined;
+				if (selectedTrackedItem && selectedTrackedItem.queueWindowId !== queueWindowId) {
+					throw new Error("This tab already belongs to a different window's Link Manager queue.");
+				}
+
 				if (closeTabIds.length > 0) {
 					const closing = new Set(closeTabIds);
 					state = {
@@ -401,9 +408,6 @@ export class LinkManagerService {
 				const trackedItem = activateTab
 					? state.items.find((item) => item.tabId === activateTab!.id)
 					: undefined;
-				if (trackedItem && trackedItem.queueWindowId !== queueWindowId) {
-					throw new Error("This tab already belongs to a different window's Link Manager queue.");
-				}
 				const reused = activateTab && !trackedItem ? activateTab : undefined;
 				if (activateTab && trackedItem) {
 					const ownership = decision && (decision.action === "activate" || decision.action === "custom")
@@ -791,7 +795,7 @@ export class LinkManagerService {
 					return item;
 				}
 				const tab = byId.get(item.tabId);
-				if (!tab || normalizeManagerUrl(tab.url ?? "") !== item.url) {
+				if (!tab) {
 					changed = true;
 					return { ...item, status: "closed" as const, tabId: null, tabWindowId: null, ownership: null };
 				}
