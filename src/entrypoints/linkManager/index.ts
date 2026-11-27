@@ -308,6 +308,75 @@ function statusLabel(item: LinkManagerItem): string {
 	return read + " · " + queue + " · " + owner + " · Window " + item.queueWindowId;
 }
 
+
+function render(): void {
+	if (!state) {
+		return;
+	}
+	($("#view-mode") as HTMLSelectElement).value = state.viewMode;
+	($("#default-ownership") as HTMLSelectElement).value = state.defaultOwnership;
+	($("#window-policy") as HTMLSelectElement).value = state.windowPolicy;
+	($("#single-click-open") as HTMLInputElement).checked = state.openOnSingleClick;
+	($("#pause") as HTMLButtonElement).textContent = state.paused ? "Resume" : "Pause";
+	($("#open-selected") as HTMLButtonElement).disabled = selectedIds.size === 0;
+
+	const listSelect = $("#list-select") as HTMLSelectElement;
+	listSelect.replaceChildren();
+	for (const list of state.lists) {
+		const option = document.createElement("option");
+		option.value = list.id;
+		option.textContent = list.name;
+		option.selected = list.id === state.activeListId;
+		listSelect.appendChild(option);
+	}
+
+	const items = state.items.filter((item) => item.queueWindowId === currentWindowId)
+		.sort((a, b) => a.order - b.order);
+	const grouped = state.viewMode === "collections";
+	const displayItems = grouped
+		? state.lists.flatMap((list) => items.filter((item) => item.listId === list.id))
+		: items;
+	visibleIds = displayItems.map((item) => item.id);
+	selectedIds = new Set([ ...selectedIds ].filter((id) => visibleIds.includes(id)));
+
+	const root = $("#items");
+	root.replaceChildren();
+	if (items.length === 0) {
+		const empty = document.createElement("div");
+		empty.className = "empty";
+		empty.textContent = state.paused
+			? "Link Manager is paused. New links will wait until resumed."
+			: "No links in this window's queue yet. Paste URLs above to begin.";
+		root.appendChild(empty);
+	} else if (grouped) {
+		for (const list of state.lists) {
+			const groupItems = items.filter((item) => item.listId === list.id);
+			if (groupItems.length === 0) {
+				continue;
+			}
+			const heading = document.createElement("div");
+			heading.className = "collection-heading";
+			heading.textContent = list.name + " (" + groupItems.length + ")";
+			root.appendChild(heading);
+			for (const item of groupItems) {
+				root.appendChild(createItemRow(item));
+			}
+		}
+	} else {
+		for (const item of items) {
+			root.appendChild(createItemRow(item));
+		}
+	}
+
+	const openCount = items.filter((item) => item.status === "open").length;
+	const unreadCount = items.filter((item) => item.readStatus === "unread").length;
+	const readCount = items.filter((item) => item.readStatus === "read").length;
+	$("#counts").textContent = items.length + " links · " + openCount + " open queue tabs · "
+		+ unreadCount + " unread · " + readCount + " read";
+	$("#queue-status").textContent = state.paused ? "Paused" : "Running";
+	paintSelection();
+}
+
 function createItemRow(item: LinkManagerItem): HTMLElement {
 	const row = document.createElement("div");
 	row.className = "item";
@@ -444,7 +513,7 @@ async function openSelected(): Promise<void> {
 		if (selected.length === 0) {
 			return;
 		}
-		const liveTabs = await browser.tabs.query();
+		const liveTabs = await browser.tabs.query({});
 		const liveTabIds = new Set(liveTabs.map((tab) => tab.id).filter((id): id is number => id !== undefined));
 		const needsReconciliation = selected.filter((item) => item.tabId === null || !liveTabIds.has(item.tabId));
 		const choices = needsReconciliation.length > 0

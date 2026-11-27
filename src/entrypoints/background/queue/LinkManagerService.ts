@@ -420,7 +420,7 @@ export class LinkManagerService {
 					if (decision?.rememberResolution) {
 						await this.saveSessionPreferences({ ...(await this.readSessionPreferences()), duplicateResolution: "activate" });
 					}
-					if (decision?.rememberOwnership && ownership) {
+					if ((decision?.action === "activate" || decision?.action === "custom") && decision.rememberOwnership && ownership) {
 						await this.saveSessionPreferences({ ...(await this.readSessionPreferences()), ownership });
 					}
 					continue;
