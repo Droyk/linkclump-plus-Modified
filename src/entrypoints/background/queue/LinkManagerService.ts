@@ -789,6 +789,99 @@ export class LinkManagerService {
 		});
 	}
 
+
+	moveItem(itemId: string, direction: -1 | 1): Promise<LinkManagerState> {
+		return this.serialize(async () => {
+			const state = await this.readState();
+			const current = state.items.find((item) => item.id === itemId);
+			if (!current) {
+				throw new Error("Link not found.");
+			}
+			const siblings = sortByOrder(state.items.filter((item) =>
+				item.queueWindowId === current.queueWindowId && item.listId === current.listId
+			));
+			const index = siblings.findIndex((item) => item.id === itemId);
+			const targetIndex = index + direction;
+			if (targetIndex < 0 || targetIndex >= siblings.length) {
+				return structuredClone(state);
+			}
+			const reordered = [ ...siblings ];
+			[ reordered[index], reordered[targetIndex] ] = [ reordered[targetIndex]!, reordered[index]! ];
+			const orderSlots = siblings.map((item) => item.order).sort((a, b) => a - b);
+			const nextOrder = new Map(reordered.map((item, position) => [ item.id, orderSlots[position]! ]));
+			const next = {
+				...state,
+				items: state.items.map((item) => nextOrder.has(item.id)
+					? { ...item, order: nextOrder.get(item.id)! }
+					: item)
+			};
+			await this.writeState(next);
+			return structuredClone(next);
+		});
+	}
+
+	removeDuplicateUrls(queueWindowId: number, listId: string): Promise<LinkManagerState> {
+		return this.removeCollectionItems(queueWindowId, listId, true);
+	}
+
+	clearCollection(queueWindowId: number, listId: string): Promise<LinkManagerState> {
+		return this.removeCollectionItems(queueWindowId, listId, false);
+	}
+
+	private removeCollectionItems(
+		queueWindowId: number,
+		listId: string,
+		duplicatesOnly: boolean
+	): Promise<LinkManagerState> {
+		return this.serialize(async () => {
+			const state = await this.readState();
+			if (!Number.isInteger(queueWindowId) || !state.lists.some((list) => list.id === listId)) {
+				throw new Error("The selected collection or browser window is invalid.");
+			}
+			const collectionItems = sortByOrder(state.items.filter((item) =>
+				item.queueWindowId === queueWindowId && item.listId === listId
+			));
+			const keepUrls = new Set<string>();
+			const removedIds = new Set<string>();
+			for (const item of collectionItems) {
+				const normalized = normalizeManagerUrl(item.url) ?? item.url;
+				if (duplicatesOnly && !keepUrls.has(normalized)) {
+					keepUrls.add(normalized);
+					continue;
+				}
+				removedIds.add(item.id);
+			}
+			if (removedIds.size === 0) {
+				return structuredClone(state);
+			}
+
+			const removedItems = collectionItems.filter((item) => removedIds.has(item.id));
+			const liveTabs = await this.tabs.query();
+			const liveById = new Map(liveTabs.filter((tab) => tab.id !== undefined).map((tab) => [ tab.id!, tab ]));
+			const managedTabIds = removedItems
+				.filter((item) => item.ownership === "managed" && item.tabId !== null && liveById.has(item.tabId))
+				.map((item) => item.tabId!);
+			const closesActiveQueueTab = removedItems.some((item) =>
+				item.ownership === "managed"
+				&& item.tabId !== null
+				&& (liveById.get(item.tabId)?.active === true
+					|| this.activeTabByWindow.get(item.tabWindowId ?? item.queueWindowId) === item.tabId)
+			);
+			const next = {
+				...state,
+				items: state.items.filter((item) => !removedIds.has(item.id))
+			};
+			await this.writeState(next);
+			if (managedTabIds.length > 0) {
+				await this.tabs.remove(managedTabIds).catch(reportManagerError);
+			}
+			if (closesActiveQueueTab && !next.paused) {
+				await this.advanceQueue(queueWindowId);
+			}
+			return structuredClone(await this.readState());
+		});
+	}
+
 	setReadStatus(itemId: string, readStatus: LinkManagerReadStatus): Promise<LinkManagerState> {
 		if (readStatus !== "unread" && readStatus !== "read") {
 			return Promise.reject(new Error("Unsupported reading status."));
@@ -816,7 +909,7 @@ export class LinkManagerService {
 			if (item.ownership === "managed" && item.tabId !== null) {
 				await this.tabs.remove(item.tabId).catch(reportManagerError);
 			}
-			if (wasActive && !next.paused) {
+			if (wasActive && item.ownership === "managed" && !next.paused) {
 				await this.advanceQueue(item.queueWindowId);
 			}
 			return structuredClone(await this.readState());

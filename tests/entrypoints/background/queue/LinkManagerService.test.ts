@@ -387,6 +387,59 @@ describe("LinkManagerService — direct sequential queue", () => {
 		expect(env.created.some((entry) => entry.url === url("managed"))).toBe(true);
 	});
 
+
+	it("reorders links within their collection without changing tab associations", async () => {
+		const env = await createEnvironment();
+		let state = await env.service.addLinks({
+			queueWindowId: 1,
+			urls: [ "first", "second", "third" ].map((part) => ({ url: url(part), title: part }))
+		});
+		const ids = state.items.map((item) => item.id);
+		state = await env.service.moveItem(ids[2]!, -1);
+		expect([ ...state.items ].sort((a, b) => a.order - b.order).map((item) => item.title))
+			.toEqual([ "first", "third", "second" ]);
+		expect(state.items[0]!.tabId).not.toBeNull();
+	});
+
+	it("removes later duplicate URLs but keeps the first saved item and borrowed browser tab", async () => {
+		const env = await createEnvironment([
+			{ id: 1, index: 0, windowId: 1, url: "https://source.example/", title: "Source", active: true },
+			{ id: 20, index: 1, windowId: 1, url: url("same"), title: "Borrowed existing", active: false }
+		]);
+		let state = await env.service.addLinks({
+			queueWindowId: 1,
+			urls: [{ url: url("same"), title: "First" }],
+			duplicateActions: [{ url: url("same"), action: "activate", activateTabId: 20, ownership: "borrowed" }]
+		});
+		state = await env.service.saveSelection([{ url: url("same"), title: "Repeated" }], 1);
+		expect(state.items).toHaveLength(2);
+		state = await env.service.removeDuplicateUrls(1, "inbox");
+		expect(state.items).toHaveLength(1);
+		expect(state.items[0]!.title).toBe("First");
+		expect(env.tabs.has(20)).toBe(true);
+	});
+
+	it("clears a collection, closing managed tabs but preserving borrowed tabs", async () => {
+		const env = await createEnvironment([
+			{ id: 1, index: 0, windowId: 1, url: "https://source.example/", title: "Source", active: true },
+			{ id: 20, index: 1, windowId: 1, url: url("borrowed"), title: "Borrowed", active: false }
+		]);
+		let state = await env.service.addLinks({
+			queueWindowId: 1,
+			urls: [
+				{ url: url("managed"), title: "Managed" },
+				{ url: url("borrowed"), title: "Borrowed" }
+			],
+			duplicateActions: [{ url: url("borrowed"), action: "activate", activateTabId: 20 }]
+		});
+		state = await env.service.openSelected(state.items.map((item) => item.id), 1);
+		const managedTabId = state.items.find((item) => item.url === url("managed"))!.tabId!;
+		state = await env.service.clearCollection(1, "inbox");
+		expect(state.items).toHaveLength(0);
+		expect(env.tabs.has(managedTabId)).toBe(false);
+		expect(env.tabs.has(20)).toBe(true);
+	});
+
 	it("removing a Borrowed item leaves its browser tab open", async () => {
 		const env = await createEnvironment([
 			{ id: 1, index: 0, windowId: 1, url: "https://source.example/", title: "Source", active: true },

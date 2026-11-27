@@ -374,6 +374,9 @@ function render(): void {
 	$("#counts").textContent = items.length + " links · " + openCount + " open queue tabs · "
 		+ unreadCount + " unread · " + readCount + " read";
 	$("#queue-status").textContent = state.paused ? "Paused" : "Running";
+	const activeListItems = items.filter((item) => item.listId === state!.activeListId);
+	($("#remove-duplicates") as HTMLButtonElement).disabled = activeListItems.length < 2;
+	($("#clear-collection") as HTMLButtonElement).disabled = activeListItems.length === 0;
 	paintSelection();
 }
 
@@ -399,6 +402,28 @@ function createItemRow(item: LinkManagerItem): HTMLElement {
 
 	const actions = document.createElement("div");
 	actions.className = "item-actions";
+	const siblings = state?.items
+		.filter((candidate) => candidate.queueWindowId === item.queueWindowId && candidate.listId === item.listId)
+		.sort((a, b) => a.order - b.order) ?? [];
+	const siblingIndex = siblings.findIndex((candidate) => candidate.id === item.id);
+	const moveUp = document.createElement("button");
+	moveUp.type = "button";
+	moveUp.textContent = "↑";
+	moveUp.title = "Move up within collection";
+	moveUp.disabled = siblingIndex <= 0;
+	moveUp.addEventListener("click", (event) => {
+		event.stopPropagation();
+		void runAction(() => send({ message: "linkManagerMoveItem", itemId: item.id, direction: -1 }));
+	});
+	const moveDown = document.createElement("button");
+	moveDown.type = "button";
+	moveDown.textContent = "↓";
+	moveDown.title = "Move down within collection";
+	moveDown.disabled = siblingIndex < 0 || siblingIndex >= siblings.length - 1;
+	moveDown.addEventListener("click", (event) => {
+		event.stopPropagation();
+		void runAction(() => send({ message: "linkManagerMoveItem", itemId: item.id, direction: 1 }));
+	});
 	const open = document.createElement("button");
 	open.type = "button";
 	open.textContent = item.status === "open" ? "Activate" : "Open";
@@ -415,7 +440,7 @@ function createItemRow(item: LinkManagerItem): HTMLElement {
 		const next: LinkManagerReadStatus = item.readStatus === "read" ? "unread" : "read";
 		void runAction(() => send({ message: "linkManagerSetReadStatus", itemId: item.id, readStatus: next }));
 	});
-	actions.append(open, read);
+	actions.append(moveUp, moveDown, open, read);
 	row.append(content, actions);
 
 	row.addEventListener("click", (event: MouseEvent) => {
@@ -585,6 +610,26 @@ $("#window-policy").addEventListener("change", () => {
 $("#list-select").addEventListener("change", () => {
 	const listId = ($("#list-select") as HTMLSelectElement).value;
 	void runAction(() => send({ message: "linkManagerSetActiveList", listId }));
+});
+$("#remove-duplicates").addEventListener("click", () => {
+	if (!state || !window.confirm("Remove repeated URLs from this collection? The first occurrence will be kept.")) {
+		return;
+	}
+	void runAction(() => send({
+		message: "linkManagerRemoveDuplicateUrls",
+		queueWindowId: currentWindowId,
+		listId: ($("#list-select") as HTMLSelectElement).value
+	}));
+});
+$("#clear-collection").addEventListener("click", () => {
+	if (!state || !window.confirm("Clear all links from this collection in the current window? Managed tabs will close; Borrowed tabs will remain open.")) {
+		return;
+	}
+	void runAction(() => send({
+		message: "linkManagerClearCollection",
+		queueWindowId: currentWindowId,
+		listId: ($("#list-select") as HTMLSelectElement).value
+	}));
 });
 $("#add-list").addEventListener("click", () => {
 	const name = window.prompt("Name this collection:");

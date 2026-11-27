@@ -67,6 +67,22 @@ export function handleRequests(
 			return respond("linkManagerSetReadStatus", () => linkManagerService.setReadStatus(request.itemId, request.readStatus), sendResponse, (state) => ({ ok: true, state }));
 		case "linkManagerRemoveItem":
 			return respond("linkManagerRemoveItem", () => linkManagerService.removeItem(request.itemId), sendResponse, (state) => ({ ok: true, state }));
+		case "linkManagerMoveItem":
+			return respond("linkManagerMoveItem", () => linkManagerService.moveItem(request.itemId, request.direction), sendResponse, (state) => ({ ok: true, state }));
+		case "linkManagerRemoveDuplicateUrls":
+			return respond(
+				"linkManagerRemoveDuplicateUrls",
+				() => linkManagerService.removeDuplicateUrls(request.queueWindowId, request.listId),
+				sendResponse,
+				(state) => ({ ok: true, state })
+			);
+		case "linkManagerClearCollection":
+			return respond(
+				"linkManagerClearCollection",
+				() => linkManagerService.clearCollection(request.queueWindowId, request.listId),
+				sendResponse,
+				(state) => ({ ok: true, state })
+			);
 		case "linkManagerOpenItem":
 			return respond("linkManagerOpenItem", () => linkManagerService.openItem(request.itemId), sendResponse, (state) => ({ ok: true, state }));
 		case "linkManagerOpenSelected":

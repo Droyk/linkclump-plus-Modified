@@ -52,6 +52,9 @@ export type LinkManagerMessage =
 	| { "message": "linkManagerSetWindowPolicy"; "policy": LinkManagerWindowPolicy }
 	| { "message": "linkManagerSetReadStatus"; "itemId": string; "readStatus": LinkManagerReadStatus }
 	| { "message": "linkManagerRemoveItem"; "itemId": string }
+	| { "message": "linkManagerMoveItem"; "itemId": string; "direction": -1 | 1 }
+	| { "message": "linkManagerRemoveDuplicateUrls"; "queueWindowId": number; "listId": string }
+	| { "message": "linkManagerClearCollection"; "queueWindowId": number; "listId": string }
 	| { "message": "linkManagerOpenItem"; "itemId": string }
 	| { "message": "linkManagerOpenSelected"; "itemIds": readonly string[]; "queueWindowId": number; "duplicateActions"?: readonly LinkManagerDuplicateAction[] }
 	| { "message": "linkManagerTogglePause" };
