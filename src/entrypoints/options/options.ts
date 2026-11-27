@@ -13,6 +13,7 @@ import { detectOs } from "@/assets/js/lib/detectOs";
 import { detectBrowser } from "@/assets/js/lib/detectBrowser";
 
 import { Information } from "@/assets/js/constants/app";
+import { DEFAULT_LINK_SELECTION_SETTINGS } from "@/assets/js/constants/setting";
 import { BROWSER_CHROME } from "@/assets/js/constants/browser";
 import {
 	OS_WIN,
@@ -55,7 +56,6 @@ import "@/assets/js/lib/colorpicker/jquery.colorpicker.js";
 import "@/assets/js/lib/colorpicker/jquery.colorpicker.css";
 
 import "./style.css";
-
 
 
 /**
@@ -141,7 +141,7 @@ const optionsSchema: OptionsSchema = {
 		"copy": {
 			"name": "copy format",
 			"type": "selection",
-			"data": [ "URLS with titles", "URLS only", "URLS only space separated", "titles only", "as link HTML", "as list link HTML", "as Markdown" ],
+			"data": [ "URLS with titles", "URLS only", "URLS only space separated", "titles only", "as link HTML", "as list link HTML", "as Markdown", "as JSON" ],
 			"extra": "format of the links saved to the clipboard"
 		},
 		"delay": {
@@ -233,6 +233,7 @@ function initEvent() {
 	document.getElementById("export-setting")?.addEventListener("click", export_setting);
 
 	setup_form();
+	setupSelectionSettings();
 
 	browser.runtime.sendMessage(
 		{
@@ -246,6 +247,12 @@ function initEvent() {
 			console.error("Failed to load settings: response is null or undefined.");
 			return;
 		}
+
+		currentSettings.selection = {
+			...DEFAULT_LINK_SELECTION_SETTINGS,
+			...(currentSettings.selection ?? {})
+		};
+		renderSelectionSettings();
 
 		for (const i in currentSettings.actions) {
 			const action = currentSettings.actions[i];
@@ -270,6 +277,148 @@ function initEvent() {
 }
 
 
+/**
+ * Populates and wires the independent persistent-link-collection preferences.
+ * These preferences are optional in older settings files and are merged with defaults
+ * when those files are loaded or imported.
+ */
+function setupSelectionSettings(): void {
+	const keySelect = document.getElementById("selection-key") as HTMLSelectElement | null;
+	if (keySelect) {
+		keySelect.replaceChildren();
+		for (const code of Object.keys(keys).map(Number).filter((value) => value > 0).sort((a, b) => a - b)) {
+			const label = keys[code];
+			if (!label) {
+				continue;
+			}
+			const option = document.createElement("option");
+			option.value = String(code);
+			option.textContent = label.toUpperCase();
+			keySelect.appendChild(option);
+		}
+	}
+
+	for (const id of [ "selection-enabled", "selection-input-mode", "selection-mouse-button", "selection-key", "selection-hold-ms" ]) {
+		const control = document.getElementById(id);
+		control?.addEventListener("change", saveSelectionSettings);
+	}
+	document.getElementById("selection-input-mode")?.addEventListener("change", updateSelectionSettingVisibility);
+	updateSelectionSettingVisibility();
+}
+
+/** Reflects saved values into the controls without triggering a save. */
+function renderSelectionSettings(): void {
+	if (!currentSettings) {
+		return;
+	}
+	const selection = {
+		...DEFAULT_LINK_SELECTION_SETTINGS,
+		...(currentSettings.selection ?? {})
+	};
+
+	const enabled = document.getElementById("selection-enabled") as HTMLInputElement | null;
+	const mode = document.getElementById("selection-input-mode") as HTMLSelectElement | null;
+	const mouseButton = document.getElementById("selection-mouse-button") as HTMLSelectElement | null;
+	const key = document.getElementById("selection-key") as HTMLSelectElement | null;
+	const hold = document.getElementById("selection-hold-ms") as HTMLInputElement | null;
+
+	if (enabled) {
+		enabled.checked = selection.enabled;
+	}
+	if (mode) {
+		mode.value = selection.inputMode;
+	}
+	if (mouseButton) {
+		mouseButton.value = String(selection.mouseButton);
+	}
+	if (key && !Array.from(key.options).some((option) => option.value === String(selection.key))) {
+		const fallbackOption = document.createElement("option");
+		fallbackOption.value = String(selection.key);
+		fallbackOption.textContent = keys[selection.key]?.toUpperCase() ?? ("KEY " + selection.key);
+		key.appendChild(fallbackOption);
+	}
+	if (key) {
+		key.value = String(selection.key);
+	}
+	if (hold) {
+		hold.value = String(selection.holdDurationMs);
+	}
+
+	const error = document.getElementById("selection-error");
+	if (error) {
+		error.textContent = "";
+	}
+	updateSelectionSettingVisibility();
+}
+
+/** Validates values before persisting; malformed preferences are never broadcast. */
+function saveSelectionSettings(): void {
+	if (!currentSettings) {
+		return;
+	}
+
+	const enabled = (document.getElementById("selection-enabled") as HTMLInputElement | null)?.checked ?? false;
+	const mode = (document.getElementById("selection-input-mode") as HTMLSelectElement | null)?.value ?? "mouse-key";
+	const mouseButton = Number((document.getElementById("selection-mouse-button") as HTMLSelectElement | null)?.value ?? 2);
+	const key = Number((document.getElementById("selection-key") as HTMLSelectElement | null)?.value ?? 16);
+	const holdDurationMs = Number((document.getElementById("selection-hold-ms") as HTMLInputElement | null)?.value ?? 450);
+
+	const validMode = mode === "mouse-key" || mode === "mouse-only" || mode === "keyboard-only";
+	const validButton = mouseButton === 0 || mouseButton === 1 || mouseButton === 2;
+	const validKey = Number.isInteger(key) && key >= 1 && key <= 255;
+	const validHold = Number.isInteger(holdDurationMs) && holdDurationMs >= 100 && holdDurationMs <= 2000;
+
+	const error = document.getElementById("selection-error");
+	if (!validMode || !validButton || !validKey || !validHold) {
+		if (error) {
+			error.textContent = "Not saved: choose a valid input, key, and hold duration (100–2000 ms).";
+		}
+		return;
+	}
+
+	currentSettings.selection = {
+		enabled,
+		inputMode: mode as "mouse-key" | "mouse-only" | "keyboard-only",
+		mouseButton: mouseButton as 0 | 1 | 2,
+		key,
+		holdDurationMs
+	};
+	if (error) {
+		error.textContent = "";
+	}
+	updateSelectionSettingVisibility();
+	save_settings();
+}
+
+/** Disables irrelevant controls for the currently selected gesture type. */
+function updateSelectionSettingVisibility(): void {
+	const mode = (document.getElementById("selection-input-mode") as HTMLSelectElement | null)?.value ?? "mouse-key";
+	const mouseButton = document.getElementById("selection-mouse-button") as HTMLSelectElement | null;
+	const key = document.getElementById("selection-key") as HTMLSelectElement | null;
+	const hold = document.getElementById("selection-hold-ms") as HTMLInputElement | null;
+	const mouseLabel = document.getElementById("selection-mouse-label");
+	const keyLabel = document.getElementById("selection-key-label");
+	const holdLabel = document.getElementById("selection-hold-label");
+
+	if (mouseButton) {
+		mouseButton.disabled = mode === "keyboard-only";
+	}
+	if (key) {
+		key.disabled = mode === "mouse-only";
+	}
+	if (hold) {
+		hold.disabled = mode === "keyboard-only";
+	}
+	if (mouseLabel) {
+		mouseLabel.classList.toggle("disabled", mode === "keyboard-only");
+	}
+	if (keyLabel) {
+		keyLabel.classList.toggle("disabled", mode === "mouse-only");
+	}
+	if (holdLabel) {
+		holdLabel.classList.toggle("disabled", mode === "keyboard-only");
+	}
+}
 
 function close_form(event?: Event | JQuery.TriggeredEvent) {
 	$("#form-background").fadeOut();
@@ -920,6 +1069,11 @@ async function import_setting() {
 
 	if (isSettings(result)) {
 		currentSettings = result;
+		currentSettings.selection = {
+			...DEFAULT_LINK_SELECTION_SETTINGS,
+			...(currentSettings.selection ?? {})
+		};
+		renderSelectionSettings();
 
 		const obj = currentSettings.actions;
 		$("#settings").empty();

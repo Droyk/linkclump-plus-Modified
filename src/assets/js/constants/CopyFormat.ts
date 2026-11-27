@@ -33,6 +33,9 @@ export const CopyFormatType = {
 
 	/** Formatted as Markdown link (6) */
 	AS_MARKDOWN: 6,
+
+	/** Formatted as a JSON array of { title, url } objects (7) */
+	AS_JSON: 7,
 } as const satisfies Record<string, CopyFormat>;
 
 // Exhaustive check: verify that all values of union CopyFormat are covered by CopyFormatType constant

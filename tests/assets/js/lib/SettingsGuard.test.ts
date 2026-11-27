@@ -35,7 +35,16 @@ const testData = {
 			},
 			expected: true
 		},
-		{ name: "should return true for empty actions and blocked array", input: { actions: {}, blocked: [] }, expected: true }
+		{ name: "should return true for empty actions and blocked array", input: { actions: {}, blocked: [] }, expected: true },
+		{
+			name: "should accept valid persistent link-selection preferences",
+			input: {
+				actions: {},
+				blocked: [],
+				selection: { enabled: true, inputMode: "mouse-key", mouseButton: 2, key: 16, holdDurationMs: 450 }
+			},
+			expected: true
+		}
 	],
 	invalidCases: [
 		{ name: "should return false for null", input: null, expected: false },
@@ -49,7 +58,10 @@ const testData = {
 		{ name: "should return false if blocked property is missing", input: { actions: {} }, expected: false },
 		{ name: "should return false if blocked property is null", input: { actions: {}, blocked: null }, expected: false },
 		{ name: "should return false if blocked property is a plain object", input: { actions: {}, blocked: {} }, expected: false },
-		{ name: "should return false if blocked property is a string", input: { actions: {}, blocked: "not-an-array" }, expected: false }
+		{ name: "should return false if blocked property is a string", input: { actions: {}, blocked: "not-an-array" }, expected: false },
+		{ name: "should reject an invalid selection input mode", input: { actions: {}, blocked: [], selection: { enabled: true, inputMode: "invalid", mouseButton: 2, key: 16, holdDurationMs: 450 } }, expected: false },
+		{ name: "should reject a hold duration outside the supported range", input: { actions: {}, blocked: [], selection: { enabled: true, inputMode: "mouse-only", mouseButton: 2, key: 16, holdDurationMs: 20 } }, expected: false },
+		{ name: "should reject a present but incomplete selection block", input: { actions: {}, blocked: [], selection: {} }, expected: false }
 	]
 } as const satisfies Record<string, readonly TestCase<unknown, boolean>[]>;
 

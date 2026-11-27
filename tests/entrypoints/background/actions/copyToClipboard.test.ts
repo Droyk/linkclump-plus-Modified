@@ -62,6 +62,11 @@ const testData = {
 			expected: "[Feature \\[WIP\\] (v2)](https://example.com/test%281%29?q=%3Cval%3E)\n"
 		},
 		{
+			name: "should format AS_JSON as one JSON object",
+			input: { link: STANDARD_LINK, format: CopyFormatType.AS_JSON as CopyFormat },
+			expected: `{"title":"Example Title","url":"https://example.com/page"}`
+		},
+		{
 			name: "should collapse multiple whitespace, tabs, and newlines in titles",
 			input: {
 				link: { url: "https://example.com", title: "  Line 1\n\t  Line 2   " },
@@ -95,6 +100,17 @@ const clipboardData = {
 			name: "should wrap the links in <ul> for AS_LIST_LINK_HTML",
 			input: { urls: [ { url: "https://a.example", title: "A" } ], copy: CopyFormatType.AS_LIST_LINK_HTML as CopyFormat },
 			expected: "<ul>\n<li><a href=\"https://a.example\">A</a></li>\n</ul>\n"
+		},
+		{
+			name: "should copy JSON as an ordered array of title and URL objects",
+			input: {
+				urls: [ { url: "https://a.example", title: "A  title" }, { url: "https://b.example", title: "B" } ],
+				copy: CopyFormatType.AS_JSON as CopyFormat
+			},
+			expected: JSON.stringify([
+				{ title: "A title", url: "https://a.example" },
+				{ title: "B", url: "https://b.example" }
+			], null, 2)
 		},
 		{
 			name: "should wrap the links in <ul> when the format is stored as a numeric string",

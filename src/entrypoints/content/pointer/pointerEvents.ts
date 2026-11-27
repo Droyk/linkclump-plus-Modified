@@ -13,6 +13,7 @@ import {
 	findTouchSettingId
 } from "../matching/allowSelection";
 import { startSelection } from "../selection/lifecycle";
+import { individualPointerDown, shouldSuppressIndividualContextMenu } from "../selection/individualLinkSelection";
 import {
 	armTouchHold,
 	cancelTouchHold,
@@ -66,6 +67,11 @@ export function pointerdown(event: PointerEvent): void {
 	const stopMenuDecision = computeStopMenuOnPointerDown(pointerState, findMatchingMouseKeySetting(pointerState));
 	if (stopMenuDecision !== null) {
 		window.stop_menu = stopMenuDecision;
+	}
+
+	// A matching hold on a link takes precedence over rectangle selection.
+	if (individualPointerDown(event)) {
+		return;
 	}
 
 	// Handle pure touch input with no physical keyboard modifier held
@@ -155,7 +161,7 @@ export function contextmenu(event: MouseEvent): void {
 	// Suppress the native long-press menu (e.g. Android Chrome) while a touch hold is pending or active
 	const touchHoldInProgress = window.pointer_type === "touch" && (isTouchHoldArmed() || window.touch_active);
 
-	if (window.stop_menu || touchHoldInProgress) {
+	if (window.stop_menu || touchHoldInProgress || shouldSuppressIndividualContextMenu()) {
 		event.preventDefault();
 	}
 }
